@@ -1,0 +1,12 @@
+[project]
+name = "enter-fellowship"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "diskcache>=5.6.3",
+    "dotenv>=0.9.9",
+    "openai>=2.6.1",
+    "pypdf>=6.1.3",
+]
