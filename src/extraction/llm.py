@@ -7,12 +7,10 @@ import io
 load_dotenv()
 
 class LLM:
-    "Modelo de LLM para extração de dados de PDFs"
 
     def __init__(self, model: str = "gpt-5-mini"):
         self.model: str = model
         self.client: openai.OpenAI = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-        self.temp: float = 0.2
 
     def extract_data(self, pdf_bytes: bytes, prompt: str) -> str:
         """Extrai dados de um PDF usando o modelo LLM
@@ -25,15 +23,19 @@ class LLM:
             str: Resposta do modelo (JSON com dados extraídos)
         """
         pdf_text = self._extract_text_from_pdf(pdf_bytes)
+        
         user_message = f"{prompt}\n\nDOCUMENTO:\n{pdf_text}"
         
         response = self.client.chat.completions.create(
             model=self.model,
             messages=[
-                {"role": "system", "content": "Você é um assistente especializado em extrair dados estruturados de documentos. Retorne sempre apenas o JSON solicitado, sem explicações adicionais."},
                 {"role": "user", "content": user_message}
             ],
+            #max_completion_tokens=2000,
+            response_format={"type": "json_object"},
+            store=False,
         )
+        
         return response.choices[0].message.content
     
     def generate_prompt(self, label: str, schema: Dict[str,str]) -> str:
@@ -47,46 +49,23 @@ class LLM:
             str: Prompt formatado para o modelo LLM
         """
         
-        # Criar lista de campos com suas descrições
-        fields_description = []
-        for field_name, field_desc in schema.items():
-            fields_description.append(f'- "{field_name}": {field_desc}')
+        # Prompt MINIMALISTA para máxima velocidade
+        fields_list = "\n".join([f'"{k}": {v}' for k, v in schema.items()])
         
-        fields_text = "\n".join(fields_description)
-        
-        prompt = f"""Você é um assistente especializado em extrair informações estruturadas de documentos PDF.
+        prompt = f"""Extraia em JSON do documento "{label}":
 
-TIPO DE DOCUMENTO: {label}
+{fields_list}
 
-CAMPOS A EXTRAIR:
-{fields_text}
-
-INSTRUÇÕES:
-1. Analise cuidadosamente o documento fornecido
-2. Extraia APENAS os campos solicitados acima
-3. Retorne os dados no formato JSON com as chaves exatamente como especificado
-4. Se um campo não for encontrado, use null como valor
-5. Preserve o formato original dos dados (não faça conversões desnecessárias)
-6. Seja preciso: 1 caractere errado torna o campo inválido
-7. Retorne APENAS o JSON, sem texto adicional ou explicações
-
-FORMATO DE SAÍDA ESPERADO:
-{{
-{self._generate_json_template(schema)}
-}}
-
-Extraia os dados do documento e retorne no formato JSON especificado acima."""
+Use null se ausente. Retorne só JSON:
+{self._generate_json_template(schema)}"""
 
         return prompt
     
     def _generate_json_template(self, schema: Dict[str, str]) -> str:
-        """Gera um template JSON baseado no schema"""
-        template_lines = []
-        fields = list(schema.keys())
-        for i, field in enumerate(fields):
-            comma = "," if i < len(fields) - 1 else ""
-            template_lines.append(f'  "{field}": "valor_extraído"{comma}')
-        return "\n".join(template_lines)
+        """Gera um template JSON compacto baseado no schema"""
+        # Versão compacta para economizar tokens - JSON válido com chaves
+        fields = ", ".join([f'"{k}": "..."' for k in schema.keys()])
+        return f"{{{fields}}}"
 
     def _extract_text_from_pdf(self, pdf_bytes: bytes) -> str:
         """Extrai o texto do arquivo PDF""" 
