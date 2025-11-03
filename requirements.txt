@@ -1,0 +1,45 @@
+# ==================== CORE DEPENDENCIES ====================
+# LLM
+openai>=1.54.0
+
+# Environment
+python-dotenv>=1.0.0
+
+# ==================== PDF PROCESSING ====================
+# PDF extraction with spatial metadata
+unstructured[pdf]>=0.10.0
+
+# Note: unstructured[pdf] já inclui:
+# - pdfminer.six
+# - pillow
+# - outros deps de PDF
+
+# ==================== CACHE ====================
+# Disk cache
+diskcache>=5.6.0
+
+# Fast hashing (20-30x faster than SHA256)
+xxhash>=3.4.0
+
+# ==================== API ====================
+# Web framework
+fastapi>=0.104.0
+
+# ASGI server
+uvicorn>=0.24.0
+
+# File upload support
+python-multipart>=0.0.6
+
+# ==================== IMPLICIT DEPENDENCIES ====================
+# As seguintes são incluídas automaticamente pelas deps acima:
+# - pydantic (via fastapi)
+# - starlette (via fastapi)
+# - typing-extensions (via pydantic)
+# - anyio (via starlette)
+# - click (via uvicorn)
+
+# ==================== NOTES ====================
+# Total de dependências principais: 7
+# Tempo de instalação com UV: ~30-40 segundos
+# Tempo de instalação com pip: ~4-5 minutos

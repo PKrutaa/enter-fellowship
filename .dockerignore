@@ -1,0 +1,65 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+*.egg
+.venv/
+venv/
+ENV/
+
+# Cache e storage local
+src/storage/cache_data/*
+src/storage/templates.db
+cache_data/
+*.db
+*.db-journal
+
+# Testes
+tests/
+*.pytest_cache/
+.coverage
+htmlcov/
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Documentação e metadata
+*.md
+!API_USAGE.md
+LICENSE
+.python-version
+
+# Arquivos temporários
+*.log
+*.tmp
+*.temp
+.DS_Store
+
+# UV/Poetry
+uv.lock
+poetry.lock
+pyproject.toml
+
+# Docker
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# PDFs de teste (não copiar para imagem)
+ai-fellowship-data/
+gt_pdf/
+
