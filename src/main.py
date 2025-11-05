@@ -25,9 +25,9 @@ import time
 import uvicorn
 
 # Imports da pipeline
-from extraction.llm import LLM
-from cache.cache_manager import CacheManager
-from template.template_manager import TemplateManager
+from src.extraction.llm import LLM
+from src.cache.cache_manager import CacheManager
+from src.template.template_manager import TemplateManager
 
 # ==================== CONFIGURAÇÃO ====================
 

@@ -10,24 +10,23 @@ ENV UV_SYSTEM_PYTHON=1 \
 
 WORKDIR /app
 
-# Instala UV
-RUN apt-get update && \
-    apt-get install -y curl && \
-    curl -LsSf https://astral.sh/uv/install.sh | sh && \
-    rm -rf /var/lib/apt/lists/*
-
-ENV PATH="/root/.cargo/bin:$PATH"
-
-# Instala dependências do sistema necessárias para compilação
+# Instala dependências do sistema (compilação + UV)
 RUN apt-get update && apt-get install -y \
+    curl \
     gcc \
     g++ \
     libmagic-dev \
     && rm -rf /var/lib/apt/lists/*
 
+# Instala UV
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Adiciona UV ao PATH
+ENV PATH="/root/.local/bin:$PATH"
+
 # Copia e instala dependências
 COPY requirements.txt .
-RUN uv pip install --system -r requirements.txt
+RUN /root/.local/bin/uv pip install --system -r requirements.txt
 
 
 # ============== STAGE 2: Runtime ==============
@@ -50,6 +49,9 @@ RUN apt-get update && apt-get install -y \
     tesseract-ocr \
     tesseract-ocr-por \
     curl \
+    libgl1 \
+    libglib2.0-0 \
+    libgomp1 \
     && rm -rf /var/lib/apt/lists/*
 
 # Copia dependências Python instaladas do builder
