@@ -125,6 +125,30 @@ echo "OPENAI_API_KEY=sua-chave" > .env
 cd src && python main.py
 ```
 
+## 📦 Extração em Lote (Batch Processing)
+
+Para processar múltiplos PDFs em paralelo:
+
+```bash
+# Opção 1: Script auxiliar
+./run_batch_extraction.sh
+
+# Opção 2: Comando direto
+python3 src/batch_extract.py \
+  --pdf-dir ai-fellowship-data/files \
+  --dataset-path ai-fellowship-data/dataset.json \
+  --output-dir output
+```
+
+**Características:**
+- ✅ Processamento paralelo por label (labels diferentes em paralelo)
+- ✅ JSONs individuais salvos progressivamente
+- ✅ JSON consolidado ao final
+- ✅ Barra de progresso e estatísticas detalhadas
+- ✅ Template learning simultâneo para diferentes labels
+
+**Documentação completa:** [BATCH_EXTRACTION.md](BATCH_EXTRACTION.md)
+
 ## 📊 Desafios Endereçados
 
 ### 1. **Redução de Custo** ✅

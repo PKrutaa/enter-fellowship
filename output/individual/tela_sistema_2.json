@@ -1,0 +1,28 @@
+{
+  "pdf_path": "tela_sistema_2.pdf",
+  "label": "tela_sistema",
+  "success": true,
+  "data": {
+    "pesquisa_por": "CLIENTE",
+    "pesquisa_tipo": "CPF",
+    "sistema": "CONSIGNADO",
+    "valor_parcela": "2.372,64",
+    "cidade": "Mozarlândia"
+  },
+  "metadata": {
+    "method": "cache",
+    "pipeline_info": {
+      "method": "cache",
+      "cache_source": "L2_DISK",
+      "time": 8.392333984375e-05
+    },
+    "cache_info": {
+      "hit": true,
+      "source": "L2_DISK",
+      "cached_at": 1762278359.546387,
+      "age_seconds": 164673.5872502327,
+      "retrieval_time": 8.225440979003906e-05,
+      "is_partial": false
+    }
+  }
+}

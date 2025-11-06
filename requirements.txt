@@ -31,6 +31,9 @@ uvicorn>=0.24.0
 # File upload support
 python-multipart>=0.0.6
 
+# Progress bars
+tqdm>=4.66.0
+
 # ==================== IMPLICIT DEPENDENCIES ====================
 # As seguintes são incluídas automaticamente pelas deps acima:
 # - pydantic (via fastapi)

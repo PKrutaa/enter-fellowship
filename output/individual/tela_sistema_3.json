@@ -1,0 +1,26 @@
+{
+  "pdf_path": "tela_sistema_3.pdf",
+  "label": "tela_sistema",
+  "success": true,
+  "data": {
+    "data_referencia": "04/02/2021",
+    "selecao_de_parcelas": null,
+    "total_de_parcelas": "96"
+  },
+  "metadata": {
+    "method": "cache",
+    "pipeline_info": {
+      "method": "cache",
+      "cache_source": "L2_DISK",
+      "time": 9.608268737792969e-05
+    },
+    "cache_info": {
+      "hit": true,
+      "source": "L2_DISK",
+      "cached_at": 1762278361.7198634,
+      "age_seconds": 164671.41424965858,
+      "retrieval_time": 9.489059448242188e-05,
+      "is_partial": false
+    }
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "pdf_path": "oab_1.pdf",
+  "label": "carteira_oab",
+  "success": true,
+  "data": {
+    "nome": "JOANA D'ARC",
+    "inscricao": "101943",
+    "seccional": "PR",
+    "subsecao": "CONSELHO SECCIONAL - PARANÁ",
+    "categoria": "SUPLEMENTAR",
+    "endereco_profissional": "AVENIDA PAULISTA, Nº 2300 andar Pilotis, Bela Vista, SÃO PAULO - SP, CEP 01310300",
+    "telefone_profissional": null,
+    "situacao": "SITUAÇÃO REGULAR"
+  },
+  "metadata": {
+    "method": "cache",
+    "pipeline_info": {
+      "method": "cache",
+      "cache_source": "L2_DISK",
+      "time": 0.0002110004425048828
+    },
+    "cache_info": {
+      "hit": true,
+      "source": "L2_DISK",
+      "cached_at": 1762278346.52366,
+      "age_seconds": 164686.61289310455,
+      "retrieval_time": 0.0002067089080810547,
+      "is_partial": false
+    }
+  }
+}

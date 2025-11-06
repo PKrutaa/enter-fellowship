@@ -1,0 +1,30 @@
+{
+  "pdf_path": "oab_2.pdf",
+  "label": "carteira_oab",
+  "success": true,
+  "data": {
+    "nome": "LUIS FILIPE ARAUJO AMARAL",
+    "inscricao": "101943",
+    "seccional": "PR",
+    "subsecao": "CONSELHO SECCIONAL - PARANÁ",
+    "categoria": "SUPLEMENTAR",
+    "endereco_profissional": "AVENIDA PAULISTA, Nº 2300 andar Pilotis, Bela Vista SÃO PAULO - SP",
+    "situacao": "SITUAÇÃO REGULAR"
+  },
+  "metadata": {
+    "method": "cache",
+    "pipeline_info": {
+      "method": "cache",
+      "cache_source": "L2_DISK",
+      "time": 0.00015807151794433594
+    },
+    "cache_info": {
+      "hit": true,
+      "source": "L2_DISK",
+      "cached_at": 1762278351.0320802,
+      "age_seconds": 164682.1055419445,
+      "retrieval_time": 0.00015473365783691406,
+      "is_partial": false
+    }
+  }
+}
