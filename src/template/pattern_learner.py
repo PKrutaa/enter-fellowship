@@ -170,8 +170,8 @@ class PatternLearner:
                 pattern_data={
                     'x': best_match['x'],
                     'y': best_match['y'],
-                    'x_tolerance': 15,  # Aumentado
-                    'y_tolerance': 15,
+                    'x_tolerance': 30,  # Aumentado de 15 para 30 (mais flexível)
+                    'y_tolerance': 20,  # Aumentado de 15 para 20
                     'category': best_match.get('category', 'Unknown'),
                     'expected_text': field_value,  # Para validação
                     'match_score': best_score

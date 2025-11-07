@@ -3,26 +3,24 @@
 BACKEND API - Sistema de Extração de Dados de PDFs
 
 Endpoints:
-- POST /extract → Extração de dados de PDF
+- POST /extract → Extração de dados de um único PDF
+- POST /extract-batch → Extração de múltiplos PDFs em paralelo
 - GET /health → Status da API
 - GET /stats → Estatísticas de cache e templates
-
-Metas:
-- Acurácia ≥80%
-- Tempo <10s por requisição
-- Cache máximo para reduzir custos
 """
 
 from fastapi import FastAPI, File, UploadFile, Form, HTTPException
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 import json
 import tempfile
 import os
 import time
 import uvicorn
+import asyncio
+from concurrent.futures import ProcessPoolExecutor, as_completed
 
 # Imports da pipeline
 from src.pipeline import ExtractionPipeline
@@ -31,8 +29,8 @@ from src.pipeline import ExtractionPipeline
 
 app = FastAPI(
     title="PDF Data Extraction API",
-    description="API para extração estruturada de dados de PDFs com cache e template learning",
-    version="1.0.0"
+    description="API para extração estruturada de dados de PDFs com cache, template learning e processamento em batch",
+    version="2.0.0"
 )
 
 # CORS (permite chamadas do frontend)
@@ -67,6 +65,17 @@ class HealthResponse(BaseModel):
     version: str
     uptime_seconds: float
     components: Dict[str, str]
+
+
+class BatchExtractResponse(BaseModel):
+    """Modelo de resposta da extração em batch"""
+    success: bool
+    total_files: int
+    successful: int
+    failed: int
+    results: List[Dict[str, Any]]
+    processing_time_seconds: float
+    metadata: Dict[str, Any]
 
 
 # ==================== ENDPOINTS ====================
@@ -170,6 +179,230 @@ async def extract_data(
             status_code=500,
             detail=f"Erro durante extração: {str(e)}"
         )
+
+
+@app.post("/extract-batch")
+async def extract_batch(
+    files: List[UploadFile] = File(..., description="Lista de arquivos PDF para extração"),
+    label: str = Form(..., description="Tipo do documento (mesmo para todos os PDFs)"),
+    extraction_schema: str = Form(..., description="JSON com schema de campos a extrair (mesmo para todos)")
+):
+    """
+    Extrai dados de múltiplos PDFs em batch com streaming progressivo
+    
+    **Parâmetros:**
+    - `files`: Lista de arquivos PDF (multipart/form-data)
+    - `label`: Tipo do documento (ex: 'carteira_oab', 'tela_sistema')
+    - `extraction_schema`: Schema em JSON (mesmo do endpoint /extract)
+    
+    **Exemplo de extraction_schema:**
+    ```json
+    {
+        "nome": "Nome do profissional",
+        "cpf": "CPF no formato XXX.XXX.XXX-XX",
+        "data_nascimento": "Data de nascimento"
+    }
+    ```
+    
+    **Características:**
+    - ✅ **Streaming progressivo**: Retorna cada resultado assim que processa
+    - ✅ **Server-Sent Events (SSE)**: Cliente recebe atualizações em tempo real
+    - ✅ Processamento sequencial para template learning efetivo
+    - ✅ Estatísticas finais após processar todos os arquivos
+    - ✅ Falhas individuais não param o batch
+    
+    **Formato da Resposta (SSE):**
+    
+    Evento 1 (arquivo processado):
+    ```
+    event: result
+    data: {"file_index": 0, "filename": "doc.pdf", "success": true, "data": {...}}
+    ```
+    
+    Evento 2 (arquivo processado):
+    ```
+    event: result
+    data: {"file_index": 1, "filename": "doc2.pdf", "success": true, "data": {...}}
+    ```
+    
+    Evento final (estatísticas):
+    ```
+    event: complete
+    data: {"total_files": 2, "successful": 2, "failed": 0, "metadata": {...}}
+    ```
+    
+    **Observação:** Todos os PDFs devem ser do mesmo tipo (mesmo label/schema).
+    Para processar PDFs de tipos diferentes, faça requisições separadas.
+    """
+    
+    # Valida parâmetros antes de iniciar streaming
+    try:
+        # Valida que há pelo menos 1 arquivo
+        if not files or len(files) == 0:
+            raise HTTPException(
+                status_code=400,
+                detail="Nenhum arquivo foi enviado"
+            )
+        
+        # Parse schema
+        try:
+            schema = json.loads(extraction_schema)
+        except json.JSONDecodeError:
+            raise HTTPException(
+                status_code=400,
+                detail="extraction_schema deve ser um JSON válido"
+            )
+        
+        if not isinstance(schema, dict):
+            raise HTTPException(
+                status_code=400,
+                detail="extraction_schema deve ser um objeto JSON"
+            )
+        
+        # Valida e salva arquivos temporariamente
+        temp_files = []
+        filenames = []
+        
+        for i, file in enumerate(files):
+            # Valida tipo de arquivo
+            if not file.filename.lower().endswith('.pdf'):
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Arquivo {i} ({file.filename}) não é um PDF"
+                )
+            
+            content = await file.read()
+            temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
+            temp_file.write(content)
+            temp_file.close()
+            temp_files.append(temp_file.name)
+            filenames.append(file.filename)
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Erro ao processar arquivos: {str(e)}"
+        )
+    
+    # Generator para streaming
+    async def generate_results():
+        start_time = time.time()
+        successful = 0
+        failed = 0
+        methods_used = {}
+        total_extraction_time = 0
+        
+        try:
+            # Processa cada PDF sequencialmente
+            for i, temp_file_path in enumerate(temp_files):
+                try:
+                    with open(temp_file_path, "rb") as f:
+                        pdf_bytes = f.read()
+                    
+                    # Usa a pipeline global
+                    result = pipeline.extract(pdf_bytes, label, schema)
+                    
+                    # Separa dados de metadata
+                    data = {k: v for k, v in result.items() if not k.startswith("_")}
+                    
+                    method = result.get("_pipeline", {}).get("method", "unknown")
+                    extraction_time = result.get("_pipeline", {}).get("time", 0)
+                    
+                    # Prepara resultado
+                    result_data = {
+                        "file_index": i,
+                        "filename": filenames[i],
+                        "success": True,
+                        "data": data,
+                        "metadata": {
+                            "method": method,
+                            "time": extraction_time,
+                            "pipeline_info": result.get("_pipeline", {}),
+                            "cache_info": result.get("_cache", {})
+                        }
+                    }
+                    
+                    # Envia evento SSE
+                    yield f"event: result\n"
+                    yield f"data: {json.dumps(result_data, ensure_ascii=False)}\n\n"
+                    
+                    successful += 1
+                    methods_used[method] = methods_used.get(method, 0) + 1
+                    total_extraction_time += extraction_time
+                
+                except Exception as e:
+                    # Erro ao processar arquivo individual
+                    error_data = {
+                        "file_index": i,
+                        "filename": filenames[i],
+                        "success": False,
+                        "error": str(e),
+                        "metadata": {}
+                    }
+                    
+                    yield f"event: result\n"
+                    yield f"data: {json.dumps(error_data, ensure_ascii=False)}\n\n"
+                    
+                    failed += 1
+            
+            # Limpa arquivos temporários
+            for temp_file in temp_files:
+                try:
+                    os.unlink(temp_file)
+                except:
+                    pass
+            
+            # Calcula estatísticas finais
+            processing_time = time.time() - start_time
+            
+            final_data = {
+                "total_files": len(temp_files),
+                "successful": successful,
+                "failed": failed,
+                "processing_time_seconds": round(processing_time, 3),
+                "metadata": {
+                    "label": label,
+                    "methods_used": methods_used,
+                    "avg_time_per_file": round(processing_time / len(temp_files), 3) if temp_files else 0,
+                    "total_extraction_time": round(total_extraction_time, 3),
+                    "overhead_time": round(processing_time - total_extraction_time, 3)
+                }
+            }
+            
+            # Envia evento de conclusão
+            yield f"event: complete\n"
+            yield f"data: {json.dumps(final_data, ensure_ascii=False)}\n\n"
+        
+        except Exception as e:
+            # Erro geral durante processamento
+            error_final = {
+                "error": f"Erro durante processamento: {str(e)}",
+                "total_files": len(temp_files),
+                "successful": successful,
+                "failed": failed
+            }
+            
+            yield f"event: error\n"
+            yield f"data: {json.dumps(error_final, ensure_ascii=False)}\n\n"
+            
+            # Limpa arquivos temporários
+            for temp_file in temp_files:
+                try:
+                    os.unlink(temp_file)
+                except:
+                    pass
+    
+    # Retorna streaming response
+    return StreamingResponse(
+        generate_results(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no"  # Desabilita buffering do nginx
+        }
+    )
 
 
 @app.get("/health", response_model=HealthResponse)

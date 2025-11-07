@@ -21,11 +21,11 @@ class TemplateManager:
     5. Aprende padrões do resultado da LLM
     """
     
-    # Thresholds - AJUSTADOS PARA GARANTIR ≥80% ACURÁCIA
-    RIGID_THRESHOLD = 0.95  # Formulários MUITO similares (quase idênticos)
-    FLEXIBLE_THRESHOLD = 0.85  # Threshold alto para evitar erros
-    MIN_CONFIDENCE = 0.85  # Confiança alta necessária
-    MIN_SAMPLES = 3  # Mínimo de amostras antes de confiar no template
+    # Thresholds - Balanceados para acurácia e velocidade
+    RIGID_THRESHOLD = 0.70  # Formulários com estrutura similar (70%+)
+    FLEXIBLE_THRESHOLD = 0.60  # Documentos mais flexíveis (60%+)
+    MIN_CONFIDENCE = 0.80  # Confiança mínima no template
+    MIN_SAMPLES = 2  # Mínimo de 2 amostras para considerar template confiável
     
     def __init__(self, db_path: str = "./src/storage/templates.db"):
         self.db = TemplateDatabase(db_path)
@@ -168,8 +168,10 @@ class TemplateManager:
             self.db.increment_sample_count(template_id)
             
             # Atualiza confiança baseado em sucessos
+            # Fórmula ajustada: começa em 0.70, cresce 0.10 por sample
+            # Com 3 samples: 0.70 + 0.30 = 1.00 (limitado a 0.95)
             sample_count = template['sample_count'] + 1
-            new_confidence = min(0.95, 0.6 + (sample_count * 0.05))
+            new_confidence = min(0.95, 0.70 + (sample_count * 0.10))
             
             with self.db._get_connection() as conn:
                 cursor = conn.cursor()
@@ -192,6 +194,17 @@ class TemplateManager:
                 reference_text=text,
                 text_hash=text_hash
             )
+            
+            # Define confidence inicial (primeiro sample)
+            initial_confidence = 0.70 + (1 * 0.10)  # = 0.80
+            with self.db._get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    UPDATE templates
+                    SET confidence = ?
+                    WHERE id = ?
+                """, (initial_confidence, template_id))
+                conn.commit()
         
         # Aprende padrões para cada campo
         for field_name, field_desc in schema.items():

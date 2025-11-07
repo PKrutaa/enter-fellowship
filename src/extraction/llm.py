@@ -26,6 +26,8 @@ class LLM:
         pdf_text = self._prepare_for_llm(elements)
         
         user_message = f"{prompt}\n\n{pdf_text}"
+
+        print(user_message)
         
         response = self.client.chat.completions.create(
             model=self.model,

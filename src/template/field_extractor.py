@@ -109,6 +109,19 @@ class FieldExtractor:
             best = max(candidates, key=lambda c: c['score'])
             return best['element']['text']
         
+        # FALLBACK: Se não encontrou na posição exata, tenta busca fuzzy
+        # procurando texto similar ao expected_text
+        expected = pattern.get('expected_text', '')
+        if expected:
+            for elem in elements:
+                # Busca texto que contém parte do esperado
+                if expected.lower() in elem['text'].lower() or elem['text'].lower() in expected.lower():
+                    # Verifica se não é um label comum
+                    text_lower = elem['text'].lower().strip()
+                    is_likely_label = any(label in text_lower for label in common_labels)
+                    if not is_likely_label:
+                        return elem['text']
+        
         return None
     
     def _extract_by_regex(
