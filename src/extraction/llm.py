@@ -16,7 +16,7 @@ class LLM:
         """Extrai dados de um PDF usando o modelo LLM
         
         Args:
-            pdf_bytes: Bytes do arquivo PDF
+            pdf_path: Caminho para o arquivo PDF
             prompt: Prompt com instruções de extração
             
         Returns:

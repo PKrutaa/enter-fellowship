@@ -1,0 +1,49 @@
+# ==================== VERCEL-OPTIMIZED REQUIREMENTS ====================
+# Versões testadas para Vercel (Amazon Linux 2 / Python 3.9+)
+# Foca em wheels pré-compilados para evitar build errors
+
+# ==================== CORE ====================
+openai==1.54.0
+python-dotenv==1.0.0
+
+# ==================== API ====================
+fastapi==0.104.1
+uvicorn[standard]==0.24.0.post1
+python-multipart==0.0.6
+
+# ==================== CACHE ====================
+diskcache==5.6.3
+xxhash==3.4.1
+
+# ==================== PDF PROCESSING ====================
+# Stack otimizada para Vercel - evita lxml, numpy, matplotlib
+
+# Unstructured (versão com melhor suporte a wheels)
+# Instalamos SEM o extra [pdf] para evitar dependências pesadas
+unstructured==0.11.8
+
+# PDF parsing (puro Python, rápido)
+pdfminer.six==20231228
+pypdf==3.17.4
+
+# Image handling (tem wheels)
+Pillow==10.1.0
+
+# Text detection e utilities
+langdetect==1.0.9
+chardet==5.2.0
+filetype==1.2.0
+
+# Utilities
+tqdm==4.66.1
+requests==2.31.0
+
+# Markup/HTML parsing (versão com wheel)
+beautifulsoup4==4.12.2
+lxml==4.9.3
+
+# NOTA: Se lxml ainda der problema, remova e use apenas html.parser do BS4
+# Ou tente estas alternativas:
+# - lxml-html-clean (mais leve)
+# - html5lib (puro Python)
+

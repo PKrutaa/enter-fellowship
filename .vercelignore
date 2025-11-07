@@ -1,0 +1,48 @@
+# Arquivos a serem ignorados no deploy Vercel
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Cache local
+src/storage/cache_data/
+*.db-shm
+*.db-wal
+
+# Development
+.env
+.venv/
+venv/
+*.log
+
+# Git
+.git/
+.gitignore
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Data files (opcional - pode incluir se necessário)
+ai-fellowship-data/
+gt_pdf/
+
+# Scripts de desenvolvimento
+run_batch_extraction.sh
+start_local.sh
+
+# Docker (não usado no Vercel)
+Dockerfile
+docker-compose.yml
+
