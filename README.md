@@ -88,6 +88,12 @@ python src/batch_extract.py \
   --pdf-dir ai-fellowship-data/files \
   --dataset-path ai-fellowship-data/dataset.json \
   --output-dir output
+
+# Ou utilize uv (recomendado)
+uv run src/batch_extract.py \
+  --pdf-dir ai-fellowship-data/files \
+  --dataset-path ai-fellowship-data/dataset.json \
+  --output-dir output
 ```
 
 **Estrutura esperada do dataset.json:**
