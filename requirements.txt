@@ -1,48 +1,49 @@
-# ==================== CORE DEPENDENCIES ====================
-# LLM
-openai>=1.54.0
+# ==================== VERCEL-OPTIMIZED REQUIREMENTS ====================
+# Versões testadas para Vercel (Amazon Linux 2 / Python 3.9+)
+# Foca em wheels pré-compilados para evitar build errors
 
-# Environment
-python-dotenv>=1.0.0
-
-# ==================== PDF PROCESSING ====================
-# PDF extraction with spatial metadata
-unstructured[pdf]>=0.10.0
-
-# Note: unstructured[pdf] já inclui:
-# - pdfminer.six
-# - pillow
-# - outros deps de PDF
-
-# ==================== CACHE ====================
-# Disk cache
-diskcache>=5.6.0
-
-# Fast hashing (20-30x faster than SHA256)
-xxhash>=3.4.0
+# ==================== CORE ====================
+openai==1.54.0
+python-dotenv==1.0.0
 
 # ==================== API ====================
-# Web framework
-fastapi>=0.104.0
+fastapi==0.104.1
+uvicorn[standard]==0.24.0.post1
+python-multipart==0.0.6
 
-# ASGI server
-uvicorn>=0.24.0
+# ==================== CACHE ====================
+diskcache==5.6.3
+xxhash==3.4.1
 
-# File upload support
-python-multipart>=0.0.6
+# ==================== PDF PROCESSING ====================
+# Stack otimizada para Vercel - evita lxml, numpy, matplotlib
 
-# Progress bars
-tqdm>=4.66.0
+# Unstructured (versão com melhor suporte a wheels)
+# Instalamos SEM o extra [pdf] para evitar dependências pesadas
+unstructured==0.11.8
 
-# ==================== IMPLICIT DEPENDENCIES ====================
-# As seguintes são incluídas automaticamente pelas deps acima:
-# - pydantic (via fastapi)
-# - starlette (via fastapi)
-# - typing-extensions (via pydantic)
-# - anyio (via starlette)
-# - click (via uvicorn)
+# PDF parsing (puro Python, rápido)
+pdfminer.six==20231228
+pypdf==3.17.4
 
-# ==================== NOTES ====================
-# Total de dependências principais: 7
-# Tempo de instalação com UV: ~30-40 segundos
-# Tempo de instalação com pip: ~4-5 minutos
+# Image handling (tem wheels)
+Pillow==10.1.0
+
+# Text detection e utilities
+langdetect==1.0.9
+chardet==5.2.0
+filetype==1.2.0
+
+# Utilities
+tqdm==4.66.1
+requests==2.31.0
+
+# Markup/HTML parsing (versão com wheel)
+beautifulsoup4==4.12.2
+lxml==4.9.3
+
+# NOTA: Se lxml ainda der problema, remova e use apenas html.parser do BS4
+# Ou tente estas alternativas:
+# - lxml-html-clean (mais leve)
+# - html5lib (puro Python)
+
