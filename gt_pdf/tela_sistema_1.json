@@ -2,8 +2,8 @@
   "data_base": "03/09/2025",
   "data_verncimento": "12/10/2025",
   "quantidade_parcelas": null,
-  "produto": null,
-  "sistema": "CONSIGNADO",
+  "produto": "CONSIGNADO",
+  "sistema": null,
   "tipo_de_operacao": null,
   "tipo_de_sistema": null
 }

@@ -88,64 +88,32 @@ class ExtractionPipeline:
                 elements=elements_data
             )
             
-            if should_use:
-                # USA TEMPLATE HÍBRIDO (template + LLM fallback)
+            # PATH A: Template puro (alta confiança >= 90%)
+            if should_use and similarity >= 0.90:
                 template_start = time.time()
-                template_result = self.template_manager.extract_with_template(template_id, elements_data)
+                result = self.template_manager.extract_with_template(template_id, elements_data)
                 template_time = time.time() - template_start
                 
-                # Identifica campos que falharam (None ou vazios)
-                failed_fields = {}
-                for field_name, field_desc in schema.items():
-                    value = template_result.get(field_name)
-                    if value is None or str(value).strip() == '' or str(value).strip().lower() == 'none':
-                        failed_fields[field_name] = field_desc
-                
-                # Se tem campos falhados, usa LLM apenas para eles
-                if failed_fields:
-                    llm_start = time.time()
-                    prompt = self.llm.generate_prompt(label, failed_fields)
-                    llm_result_json = self.llm.extract_data(tmp_path, prompt)
-                    llm_time = time.time() - llm_start
-                    
-                    try:
-                        llm_result = json.loads(llm_result_json)
-                        # Merge: sobrescreve campos falhados com resultado LLM
-                        for field in failed_fields.keys():
-                            if field in llm_result and llm_result[field]:
-                                template_result[field] = llm_result[field]
-                    except json.JSONDecodeError:
-                        pass  # Mantém resultado do template
-                    
-                    method_used = "hybrid"  # Template + LLM
-                    total_time = template_time + llm_time
-                    self.stats["template_hits"] += 1
-                    self.stats["llm_calls"] += 1
-                else:
-                    method_used = "template"  # 100% template
-                    total_time = template_time
-                    self.stats["template_hits"] += 1
-                
-                result = template_result
+                method_used = "template"
+                total_time = template_time
+                self.stats["template_hits"] += 1
                 
                 # Armazena no cache
-                self.cache.set(pdf_bytes, label, schema, result, 
+                self.cache.set(pdf_bytes, label, schema, result,
                              metadata={"method": method_used, "time": total_time})
                 
                 result["_pipeline"] = {
                     "method": method_used,
                     "similarity": round(similarity * 100, 1),
-                    "time": total_time,
-                    "template_fields": len(schema) - len(failed_fields),
-                    "llm_fields": len(failed_fields)
+                    "time": total_time
                 }
                 
                 return result
             
-            # STEP 3: LLM
+            # PATH B: LLM com structured outputs
             llm_start = time.time()
             prompt = self.llm.generate_prompt(label, schema)
-            result_json = self.llm.extract_data(tmp_path, prompt)
+            result_json = self.llm.extract_data(tmp_path, prompt, schema, label)
             llm_time = time.time() - llm_start
             
             self.stats["llm_calls"] += 1
@@ -157,7 +125,7 @@ class ExtractionPipeline:
             except json.JSONDecodeError:
                 result = {field: None for field in schema.keys()}
             
-            # STEP 4: Learning
+            # STEP 3: Learning - aprende padrões para futuras extrações
             self.template_manager.learn_from_extraction(
                 pdf_path=tmp_path,
                 label=label,
@@ -167,7 +135,7 @@ class ExtractionPipeline:
                 extraction_time=llm_time
             )
             
-            # STEP 5: Cache Storage
+            # STEP 4: Cache Storage
             self.cache.set(pdf_bytes, label, schema, result,
                          metadata={"method": "llm", "time": llm_time})
             

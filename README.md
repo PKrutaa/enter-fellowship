@@ -1,156 +1,52 @@
 # 🚀 Sistema de Extração de Dados de PDFs
 
-Sistema completo para extração estruturada de dados de documentos PDF com alta acurácia, baixa latência e custo otimizado.
+Sistema de extração estruturada de dados de documentos PDF com alta acurácia, baixa latência e custo otimizado. Production-ready.
 
-## 🏗️ Arquitetura Híbrida
+## 📋 Tabela de Conteúdo
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                        REQUISIÇÃO                           │
-│              (PDF + Label + Schema)                         │
-└──────────────────────┬──────────────────────────────────────┘
-                       │
-                       ▼
-          ┌────────────────────────┐
-          │   1. CACHE CHECK       │
-          │   L1 (Memory) → L2     │
-          │   <0.001s              │
-          └────────┬───────────────┘
-                   │
-            ┌──────┴──────┐
-            │ Cache Hit?  │
-            └──────┬──────┘
-                   │
-         ┌─────────┴─────────┐
-         │ YES               │ NO
-         ▼                   ▼
-    ┌────────┐      ┌────────────────┐
-    │ RETURN │      │ 2. TEMPLATE    │
-    │ <1ms   │      │    MATCHING    │
-    └────────┘      │                │
-                    │ • Similaridade │
-                    │   Estrutural   │
-                    │ • Confiança    │
-                    │ • MIN_SAMPLES  │
-                    └────────┬───────┘
-                             │
-                      ┌──────┴──────┐
-                      │ Template    │
-                      │ Aplicável?  │
-                      │ (>70% sim,  │
-                      │  >80% conf) │
-                      └──────┬──────┘
-                             │
-                   ┌─────────┴─────────┐
-                   │ YES               │ NO
-                   ▼                   ▼
-          ┌─────────────────┐   ┌────────────┐
-          │ 3a. EXTRAÇÃO    │   │ 3b. LLM    │
-          │     HÍBRIDA     │   │  COMPLETO  │
-          │                 │   │            │
-          │ ┌─────────────┐ │   │  ~3-5s     │
-          │ │  Template   │ │   └─────┬──────┘
-          │ │  (rápido)   │ │         │
-          │ └──────┬──────┘ │         │
-          │        │        │         │
-          │ ┌──────▼──────┐ │         │
-          │ │ Campos OK?  │ │         │
-          │ └──────┬──────┘ │         │
-          │        │        │         │
-          │    ┌───┴───┐    │         │
-          │    │ Falta │    │         │
-          │    │campos?│    │         │
-          │    └───┬───┘    │         │
-          │        ▼        │         │
-          │ ┌─────────────┐ │         │
-          │ │ LLM Fallback│ │         │
-          │ │(só campos   │ │         │
-          │ │ faltantes)  │ │         │
-          │ └──────┬──────┘ │         │
-          │        │        │         │
-          │ ┌──────▼──────┐ │         │
-          │ │   Merge     │ │         │
-          │ │  Resultados │ │         │
-          │ └──────┬──────┘ │         │
-          │        │        │         │
-          │  ~1-2s (médio) │         │
-          └────────┬────────┘         │
-                   │                  │
-                   │    ┌─────────────┘
-                   │    │
-                   ▼    ▼
-              ┌─────────────┐
-              │ 4. LEARN    │
-              │  PATTERNS   │
-              │             │
-              │ • Posição   │
-              │ • Contexto  │
-              │ • Regex     │
-              └──────┬──────┘
-                     │
-              ┌──────▼──────┐
-              │ 5. CACHE    │
-              │   STORE     │
-              └──────┬──────┘
-                     │
-                     ▼
-              ┌──────────┐
-              │ RESPONSE │
-              └──────────┘
-```
+- [Início Rápido com Docker](#-início-rápido-com-docker)
+- [Processamento em Batch (Sem UI)](#-processamento-em-batch-sem-ui)
+- [API REST](#-api-rest)
+- [Arquitetura](#-arquitetura)
+- [Performance](#-performance)
 
-## 🔧 Componentes
+---
 
-### 1. **LLM Extractor** (`src/extraction/llm.py`)
-- Modelo: `gpt-5-mini` com `reasoning_effort="minimal"`
-- Extração via `unstructured` com coordenadas espaciais
-- Prompt otimizado para velocidade e acurácia
-- Tempo: ~2-5s por documento
+## 🐳 Início Rápido com Docker
 
-### 2. **Cache Manager** (`src/cache/cache_manager.py`)
-- **L1 (Memory)**: LRU cache, 100 itens, ~0.1ms
-- **L2 (Disk)**: DiskCache persistente, ~0.5-2ms
-- **L3 (Partial)**: Match parcial de schema, ~1-5ms
-- Hit rate: 50-90% (depois de warm-up)
+### Pré-requisitos
+- Docker e Docker Compose instalados
+- Chave da API OpenAI
 
-### 3. **Template Learning Híbrido** (`src/template/`)
-- **Pattern Learner**: Aprende position, regex, context a partir de extrações LLM
-- **Template Matcher**: Similaridade multi-métrica (estrutural 70% + tokens 20% + caracteres 10%)
-- **Field Extractor**: Extrai campos conhecidos + fallback LLM para campos faltantes
-- **Database**: SQLite para persistência de templates e confiança
-- **Thresholds**: Similaridade >70% + Confiança >80% + Min 2 amostras
-- Tempo: ~1-2s (híbrido) ou ~0.5s (template 100%)
+### Passo a Passo
 
-### 4. **FastAPI Backend** (`src/main.py`)
-- **POST `/extract`**: Extração individual de PDF
-- **POST `/extract-batch`**: Extração em batch (múltiplos PDFs) ⚡
-- **GET `/health`**: Status da API
-- **GET `/stats`**: Estatísticas detalhadas
-- Documentação automática (Swagger UI em `/docs`)
-
-## 🚀 Início Rápido
-
-### Opção 1: Docker (Produção) 🐳
-
-**Ideal para:** Deploy, ambientes isolados, CI/CD
-
+**1. Configure a API Key**
 ```bash
-# 1. Configure API key
 echo "OPENAI_API_KEY=sua-chave-aqui" > .env
+```
 
-# 2. Build e inicie
+**2. Inicie os containers**
+```bash
 docker compose up -d
+```
 
-# 3. Verifique logs
+**3. Verifique se está funcionando**
+```bash
+# Ver logs
 docker compose logs -f
 
-# 4. Acesse
-# API: http://localhost:8000
-# Docs: http://localhost:8000/docs
-# Health: http://localhost:8000/health
+# Testar health check
+curl http://localhost:8000/health
 ```
 
-**Comandos úteis:**
+**4. Acesse a API**
+- **API**: http://localhost:8000
+- **Documentação**: http://localhost:8000/docs
+- **Health**: http://localhost:8000/health
+- **Stats**: http://localhost:8000/stats
+
+### Comandos Docker Úteis
+
 ```bash
 # Parar containers
 docker compose down
@@ -158,604 +54,528 @@ docker compose down
 # Rebuild após mudanças
 docker compose up -d --build
 
-# Ver status
-docker compose ps
-
-# Logs em tempo real
+# Ver logs em tempo real
 docker compose logs -f api
-```
-
-### Opção 2: Local com UV ⚡ (Desenvolvimento)
-
-**Ideal para:** Desenvolvimento local, testes rápidos
-
-**💡 UV é 10-100x mais rápido que pip!**
-
-```bash
-# 1. Instale UV (se ainda não tiver)
-curl -LsSf https://astral.sh/uv/install.sh | sh
-# ou: pip install uv
-
-# 2. Instale dependências (rápido! ~2s)
-uv pip install -r requirements.txt
-
-# 3. Configure .env
-echo "OPENAI_API_KEY=sua-chave-aqui" > .env
-
-# 4. Inicie API
-uv run src/main.py
-
-# Ou use o script auxiliar
-./start_local.sh
-```
-
-**Script `start_local.sh`:**
-```bash
-#!/bin/bash
-# Inicia a API localmente com UV
-
-set -e
-
-echo "🚀 Iniciando API com UV..."
-
-# Verifica se UV está instalado
-if ! command -v uv &> /dev/null; then
-    echo "❌ UV não encontrado. Instalando..."
-    curl -LsSf https://astral.sh/uv/install.sh | sh
-fi
-
-# Verifica .env
-if [ ! -f .env ]; then
-    echo "⚠️  Arquivo .env não encontrado"
-    echo "📝 Crie um arquivo .env com: OPENAI_API_KEY=sua-chave"
-    exit 1
-fi
-
-# Instala dependências
-echo "📦 Instalando dependências..."
-uv pip install -r requirements.txt
-
-# Inicia API
-echo "✅ Iniciando API em http://localhost:8000"
-echo "📚 Docs disponíveis em http://localhost:8000/docs"
-uv run src/main.py
-```
-
-### Opção 3: Local com Python puro (Alternativa)
-
-```bash
-# 1. Crie ambiente virtual
-python3 -m venv venv
-source venv/bin/activate  # Linux/Mac
-
-# 2. Instale dependências (~30s)
-pip install -r requirements.txt
-
-# 3. Configure .env
-echo "OPENAI_API_KEY=sua-chave-aqui" > .env
-
-# 4. Inicie API
-cd src && python main.py
-```
-
-## 🐳 Guia Completo: Docker
-
-### Estrutura do Docker
-
-O projeto inclui:
-- `Dockerfile`: Imagem da API
-- `docker-compose.yml`: Orquestração dos serviços
-
-### Variáveis de Ambiente
-
-Crie um arquivo `.env` na raiz do projeto:
-
-```bash
-# OpenAI API Key (obrigatório)
-OPENAI_API_KEY=sk-proj-...
-
-# Configurações opcionais
-PORT=8000
-HOST=0.0.0.0
-LOG_LEVEL=info
-```
-
-### Comandos Docker
-
-**Iniciar:**
-```bash
-docker compose up -d
-```
-
-**Ver logs:**
-```bash
-# Todos os serviços
-docker compose logs -f
-
-# Apenas a API
-docker compose logs -f api
-
-# Últimas 100 linhas
-docker compose logs --tail=100 api
-```
-
-**Parar:**
-```bash
-# Parar containers (mantém dados)
-docker compose stop
-
-# Parar e remover containers
-docker compose down
-
-# Parar, remover containers E volumes (limpa tudo)
-docker compose down -v
-```
-
-**Rebuild:**
-```bash
-# Rebuild após mudanças no código
-docker compose up -d --build
-
-# Force rebuild do zero
-docker compose build --no-cache
-docker compose up -d
-```
-
-**Status e debugging:**
-```bash
-# Ver containers rodando
-docker compose ps
-
-# Ver uso de recursos
-docker stats
 
 # Entrar no container
 docker compose exec api bash
 
-# Ver portas expostas
-docker compose port api 8000
-```
+# Ver uso de recursos
+docker stats
 
-### Troubleshooting Docker
-
-**Problema: Porta 8000 já em uso**
-```bash
-# Opção 1: Pare o processo usando a porta
-lsof -ti:8000 | xargs kill -9
-
-# Opção 2: Mude a porta no docker-compose.yml
-ports:
-  - "8001:8000"  # Usa porta 8001 no host
-```
-
-**Problema: Mudanças no código não refletem**
-```bash
-# Rebuild forçado
-docker compose down
-docker compose up -d --build
-```
-
-**Problema: Erro de permissão no cache/templates**
-```bash
-# Limpe volumes e reinicie
+# Limpar tudo (incluindo volumes)
 docker compose down -v
-docker compose up -d
 ```
 
-### Performance Docker
+---
 
-**Cache e Persistência:**
-- Cache L2 (disk) é persistente entre reinicializações
-- Templates são salvos em `./src/storage/templates.db`
-- Volumes Docker mantêm dados entre restarts
+## 📦 Processamento em Batch (Sem UI)
 
-**Recursos:**
-```yaml
-# docker-compose.yml - ajuste conforme necessário
-services:
-  api:
-    deploy:
-      resources:
-        limits:
-          cpus: '2'
-          memory: 2G
-        reservations:
-          memory: 512M
+### Opção 1: Script CLI (Recomendado)
+
+Para processamento offline em lote de um diretório:
+
+**Executar o script:**
+```bash
+# Dentro do container Docker
+docker compose exec api python src/batch_extract.py \
+  --pdf-dir ai-fellowship-data/files \
+  --dataset-path ai-fellowship-data/dataset.json \
+  --output-dir output
+
+# Ou localmente (se tiver Python configurado)
+python src/batch_extract.py \
+  --pdf-dir ai-fellowship-data/files \
+  --dataset-path ai-fellowship-data/dataset.json \
+  --output-dir output
 ```
 
-## 📦 Extração em Lote (Batch Processing)
+**Estrutura esperada do dataset.json:**
+```json
+[
+  {
+    "pdf_path": "oab_1.pdf",
+    "label": "carteira_oab",
+    "extraction_schema": {
+      "nome": "Nome completo",
+      "inscricao": "Número de inscrição OAB"
+    }
+  },
+  {
+    "pdf_path": "tela_sistema_1.pdf",
+    "label": "tela_sistema",
+    "extraction_schema": {
+      "sistema": "Nome do sistema",
+      "valor_parcela": "Valor da parcela"
+    }
+  }
+]
+```
 
-### API Endpoint com Streaming ⚡
+**Saída:**
+- Cria arquivo `output/consolidated_results.json` com todos os resultados
+- Cria arquivos individuais em `output/` para cada PDF processado
+- Cada resultado inclui: dados extraídos, método usado (cache/template/llm), metadata do pipeline
 
-Use o endpoint `/extract-batch` para processar múltiplos PDFs com **resultados progressivos** via **Server-Sent Events (SSE)**:
+**Exemplo de saída (`consolidated_results.json`):**
+```json
+{
+  "total_processed": 2,
+  "total_success": 2,
+  "total_failed": 0,
+  "processing_time_seconds": 7.84,
+  "results": [
+    {
+      "pdf_path": "oab_1.pdf",
+      "label": "carteira_oab",
+      "success": true,
+      "data": {
+        "nome": "João Silva",
+        "inscricao": "123456"
+      },
+      "metadata": {
+        "method": "llm",
+        "pipeline_info": {
+          "method": "llm",
+          "time": 3.62
+        }
+      }
+    },
+    {
+      "pdf_path": "oab_2.pdf",
+      "label": "carteira_oab",
+      "success": true,
+      "data": {
+        "nome": "Maria Santos",
+        "inscricao": "789012"
+      },
+      "metadata": {
+        "method": "template",
+        "pipeline_info": {
+          "method": "template",
+          "similarity": 92.5,
+          "time": 0.51
+        }
+      }
+    }
+  ]
+}
+```
 
-**🎯 Vantagens do Streaming:**
-- ✅ **Resultados em tempo real**: Recebe cada PDF assim que é processado
-- ✅ **Melhor UX**: Usuário vê progresso instantâneo
-- ✅ **Timeouts flexíveis**: Timeout por arquivo, não total
-- ✅ **Processamento longo**: Ideal para batches grandes (100+ PDFs)
 
-**Exemplo de requisição (Python):**
+### Opção 2: Via API com Streaming
+
+A API suporta **processamento progressivo com Server-Sent Events (SSE)**:
+
+**Características:**
+- ✅ **Múltiplos PDFs, múltiplas labels**: Cada arquivo pode ter label e schema diferentes
+- ✅ **Processamento paralelo por label**: Labels diferentes processam simultaneamente
+- ✅ **Resultados progressivos**: Recebe cada PDF assim que é processado (não espera o batch completo)
+- ✅ **Template learning**: Documentos do mesmo label processam sequencialmente para aprendizado
+
+**Exemplo Python:**
+
 ```python
 import requests
 import json
 
-# Múltiplos PDFs do mesmo tipo
-files = [
-    ("files", ("oab_1.pdf", open("oab_1.pdf", "rb"), "application/pdf")),
-    ("files", ("oab_2.pdf", open("oab_2.pdf", "rb"), "application/pdf")),
-    ("files", ("oab_3.pdf", open("oab_3.pdf", "rb"), "application/pdf"))
+# Preparar arquivos e metadados
+files_data = [
+    {
+        "file": ("oab_1.pdf", open("oab_1.pdf", "rb"), "application/pdf"),
+        "label": "carteira_oab",
+        "schema": {"nome": "Nome completo", "inscricao": "Número OAB"}
+    },
+    {
+        "file": ("tela_1.pdf", open("tela_1.pdf", "rb"), "application/pdf"),
+        "label": "tela_sistema",
+        "schema": {"sistema": "Nome do sistema", "valor": "Valor total"}
+    },
+    {
+        "file": ("oab_2.pdf", open("oab_2.pdf", "rb"), "application/pdf"),
+        "label": "carteira_oab",
+        "schema": {"nome": "Nome completo", "inscricao": "Número OAB"}
+    }
 ]
 
-# Mesmos parâmetros do /extract
-label = "carteira_oab"
-extraction_schema = {
-    "nome": "Nome do profissional",
-    "inscricao": "Número de inscrição",
-    "seccional": "Seccional"
+# Criar FormData
+form_data = []
+for item in files_data:
+    form_data.append(("files", item["file"]))
+    
+# Adicionar labels e schemas na mesma ordem
+labels = [item["label"] for item in files_data]
+schemas = [json.dumps(item["schema"]) for item in files_data]
+
+data = {
+    "labels": labels,
+    "schemas": schemas
 }
 
-# Streaming habilitado
+# Fazer request com streaming
 response = requests.post(
     "http://localhost:8000/extract-batch",
-    files=files,
+    files=[("files", f[1]) for f in form_data],
     data={
-        "label": label,
-        "extraction_schema": json.dumps(extraction_schema)
+        "labels": labels,
+        "schemas": schemas
     },
-    stream=True  # 🔥 Habilita streaming
+    stream=True  # 🔥 Importante: habilita streaming
 )
 
-# Processa eventos SSE em tempo real
+# Processar resultados progressivamente
 for line in response.iter_lines(decode_unicode=True):
+    if not line:
+        continue
+        
     if line.startswith("event:"):
         event_type = line.split(":", 1)[1].strip()
     elif line.startswith("data:"):
         data = json.loads(line.split(":", 1)[1].strip())
         
         if event_type == "result":
-            # Resultado de arquivo individual
-            print(f"✓ {data['filename']}: {data['metadata']['method']} ({data['metadata']['time']:.2f}s)")
+            # Resultado individual (recebido assim que processa)
+            filename = data["filename"]
+            success = data["success"]
+            method = data["metadata"].get("method", "unknown")
+            time = data["metadata"].get("time", 0)
+            
+            print(f"✓ {filename}: {method} ({time:.2f}s)")
+            
+            if success:
+                print(f"  Dados: {data['data']}")
+            else:
+                print(f"  Erro: {data['error']}")
+        
         elif event_type == "complete":
             # Estatísticas finais
-            print(f"\n📊 Total: {data['successful']}/{data['total_files']} em {data['processing_time_seconds']:.2f}s")
+            print(f"\n📊 Processamento completo:")
+            print(f"  Total: {data['total_files']}")
+            print(f"  Sucesso: {data['successful']}")
+            print(f"  Falhas: {data['failed']}")
+            print(f"  Tempo: {data['processing_time_seconds']:.2f}s")
+            print(f"  Labels: {', '.join(data['metadata']['labels_processed'])}")
 ```
 
-**Formato dos Eventos SSE:**
-
+**Como o streaming funciona:**
 ```
-event: result
-data: {"file_index": 0, "filename": "doc.pdf", "success": true, "data": {...}, "metadata": {...}}
+Envio: 2 PDFs "carteira_oab" + 3 PDFs "tela_sistema"
 
-event: result  
-data: {"file_index": 1, "filename": "doc2.pdf", "success": true, "data": {...}, "metadata": {...}}
+Processamento:
+├─ Thread 1: carteira_oab (processa sequencialmente)
+│   ├─ oab_1.pdf → 📤 SSE evento 1
+│   └─ oab_2.pdf → 📤 SSE evento 2
+│
+└─ Thread 2: tela_sistema (processa sequencialmente)
+    ├─ tela_1.pdf → 📤 SSE evento 3
+    ├─ tela_2.pdf → 📤 SSE evento 4
+    └─ tela_3.pdf → 📤 SSE evento 5
 
-event: complete
-data: {"total_files": 2, "successful": 2, "failed": 0, "metadata": {...}}
+📤 Evento final: complete
+
+Resultado: Frontend recebe cada arquivo IMEDIATAMENTE após processar!
 ```
+---
 
-**Características:**
-- ✅ **Streaming progressivo** (SSE) - resultados conforme processados
-- ✅ **Mesma interface do /extract** (label e schema únicos)
-- ✅ **Processamento sequencial** (otimizado para template learning)
-- ✅ **Estatísticas detalhadas** (métodos, tempos, sucessos/falhas)
-- ✅ **Tratamento de erros robusto** (falha individual não para o batch)
-- ✅ **Validação de arquivos** (verifica se são PDFs válidos)
+## 🌐 API REST
 
-### Script CLI (Alternativo)
+### Endpoints Disponíveis
 
-Para processamento offline/background:
+#### POST `/extract`
+Extrai dados de um PDF individual.
 
+**Request:**
 ```bash
-# Opção 1: Script auxiliar
-./run_batch_extraction.sh
-
-# Opção 2: Comando direto
-python3 src/batch_extract.py \
-  --pdf-dir ai-fellowship-data/files \
-  --dataset-path ai-fellowship-data/dataset.json \
-  --output-dir output
+curl -X POST "http://localhost:8000/extract" \
+  -F "file=@documento.pdf" \
+  -F "label=carteira_oab" \
+  -F 'extraction_schema={"nome":"Nome completo","inscricao":"Número OAB"}'
 ```
 
-**Documentação completa:** [BATCH_EXTRACTION.md](BATCH_EXTRACTION.md)
-
-## 🎯 Template Learning Melhorado
-
-### Cálculo de Similaridade Multi-Métrica
-
-O sistema usa uma abordagem híbrida para calcular similaridade entre documentos:
-
-**Fórmula:**
-```
-Similaridade Total = (Estrutural × 70%) + (Tokens × 20%) + (Caracteres × 10%)
-```
-
-**Componentes:**
-
-1. **Similaridade Estrutural (70%)**: Campos/labels presentes no documento
-   - Exemplo: "nome", "inscrição", "telefone", etc.
-   - Usa Jaccard similarity entre keywords estruturais
-   - **Mais importante**: Documentos do mesmo tipo têm mesma estrutura
-
-2. **Similaridade de Tokens (20%)**: Palavras relevantes (sem stopwords)
-   - Remove palavras comuns ("de", "a", "o", etc.)
-   - Foca em termos específicos do domínio
-   
-3. **Similaridade de Caracteres (10%)**: Comparação textual exata
-   - Usa difflib SequenceMatcher
-   - **Menos importante**: Valores variam entre documentos
-
-### Thresholds Ajustados
-
-```python
-RIGID_THRESHOLD = 0.70      # 70% para documentos estruturados
-FLEXIBLE_THRESHOLD = 0.60   # 60% para documentos flexíveis  
-MIN_CONFIDENCE = 0.80       # 80% confiança mínima
-MIN_SAMPLES = 2             # 2 amostras para ativar template
-```
-
-### Modo Híbrido (Template + LLM Fallback)
-
-Quando o template é aplicável mas falha em extrair alguns campos:
-
-**Estratégia:**
-1. **Template extrai todos os campos** (rápido, ~10-50ms)
-2. **Identifica campos faltantes** (None, vazios, ou "none")
-3. **LLM processa APENAS os campos faltantes** (preciso, ~1-2s)
-4. **Merge dos resultados** (template + LLM)
-
-**Benefícios:**
-- ✅ **Velocidade**: 2-3x mais rápido que LLM puro
-- ✅ **Acurácia**: Mantém precisão do LLM onde necessário
-- ✅ **Custo**: Reduz tokens enviados ao LLM (~60-80%)
-- ✅ **Robustez**: Template aprende com o tempo
-
-**Exemplo:**
+**Response:**
 ```json
-// 1. Template extrai (10ms)
 {
-  "nome": "João Silva",
-  "inscricao": "123456",
-  "telefone": null,  // ❌ Template falhou
-  "email": ""        // ❌ Template falhou
-}
-
-// 2. LLM processa APENAS campos faltantes (1.5s)
-{
-  "telefone": "(11) 98765-4321",
-  "email": "joao@example.com"
-}
-
-// 3. Resultado final (híbrido)
-{
-  "nome": "João Silva",           // ✓ Template
-  "inscricao": "123456",           // ✓ Template
-  "telefone": "(11) 98765-4321",  // ✓ LLM
-  "email": "joao@example.com",    // ✓ LLM
-  "_pipeline": {
-    "method": "hybrid",
-    "template_fields": 2,
-    "llm_fields": 2,
-    "time": 1.51
+  "success": true,
+  "data": {
+    "nome": "João Silva",
+    "inscricao": "123456"
+  },
+  "metadata": {
+    "method": "llm",
+    "time_seconds": 2.341,
+    "pipeline_info": {...}
   }
 }
 ```
 
-## 📊 Desafios Endereçados
+#### POST `/extract-batch`
+Extrai dados de múltiplos PDFs com streaming progressivo (SSE).
 
-### 1. **Redução de Custo** ✅
+Ver exemplo completo em [Processamento em Batch](#-processamento-em-batch-sem-ui).
 
-**Estratégias implementadas:**
-- Cache multi-level (L1 Memory/L2 Disk)
-- **Template learning híbrido** (extração inteligente + LLM fallback)
-- Prompt otimizado (menos tokens)
-- `reasoning_effort="minimal"` (reduz tokens de raciocínio)
-- **LLM parcial**: Processa apenas campos faltantes (60-80% menos tokens)
+#### GET `/health`
+Verifica saúde da API.
 
-**Resultado:**
-- 100% cache hit para mesmos documentos
-- Template híbrido: 60-80% redução de tokens LLM
-- ~10,000x mais rápido para requisições repetidas
-- ~2.9x mais rápido com template híbrido
-- Economia de ~$0.001-0.005 por documento em cache/template
-
-### 2. **Alta Acurácia** ✅
-
-**Estratégias implementadas:**
-- OCR parsing com `unstructured`
-- `unstructured` com `extract_element_metadata=True`
-- Coordenadas espaciais (x, y) para cada elemento
-- Agrupamento inteligente por linhas
-- Prompt com contexto de posição
-- `response_format="json_object"` (JSON garantido)
-
-**Resultado:**
-- 89-91% de acurácia média
-- 100% em 4 de 6 documentos
-- Supera meta de 80%
-
-### 3. **Baixa Latência** ✅
-
-**Estratégias implementadas:**
-- Cache L1 em memória (0.1ms)
-- Template matching rápido (1-5ms)
-- Prompt minimalista
-- `reasoning_effort="minimal"`
-
-**Resultado:**
-- Cache: <1ms
-- Template: 1-5ms
-- LLM: ~2-5s (vs 13-23s antes da otimização)
-- Média geral: ~2.3s primeira vez, <1ms subsequentes
-
-### 4. **Variabilidade de Layout** ✅
-
-**Estratégias implementadas:**
-- **Arquitetura híbrida**: Template extrai o que consegue + LLM complementa
-- Similaridade multi-métrica (estrutural 70% + tokens 20% + caracteres 10%)
-- Thresholds adaptativos (70% similaridade, 80% confiança)
-- Padrões múltiplos (position + regex + context)
-- Fuzzy matching para posicionamento flexível
-
-**Resultado:**
-- Documentos estruturados: 87-90% similaridade → template híbrido
-- Documentos variáveis: fallback automático para LLM
-- Acurácia mantida 77-91% em todos os casos
-- Velocidade 2-3x maior com modo híbrido
-
-## 📈 Performance
-
-### Benchmarks Reais
-
-| Cenário | Tempo | Acurácia | Método |
-|---------|-------|----------|--------|
-| **Primeira extração** | ~3.6s | 77-91% | LLM completo |
-| **Segunda extração (mesmo PDF)** | <0.001s | 100% | Cache L1 |
-| **Documento similar (híbrido)** | ~1.2s | 81-91% | Template + LLM fallback |
-| **Documento similar (template 100%)** | ~0.5s | 81-91% | Template puro |
-
-### Evolução da Performance (Fluxo Real)
-
-```
-Request 1 (oab_1.pdf): LLM completo  → 3.62s  (aprende template)
-Request 2 (oab_1.pdf): Cache L1      → 0.2ms  (21.445x faster! ⚡)
-Request 3 (oab_2.pdf): Híbrido       → 1.24s  (2.9x faster ⚡)
-                       ├─ Template: 0.05s (6 campos)
-                       └─ LLM: 1.19s (2 campos)
-Request 4 (oab_3.pdf): Template 100% → 0.51s  (7.1x faster ⚡⚡)
-Request 5 (oab_2.pdf): Cache L1      → 0.2ms  (6.200x faster!)
-```
-
-**💡 Insight:** A arquitetura híbrida aprende com cada extração, ficando progressivamente mais rápida.
-
-## 🧪 Testes
-
-### Teste via API (Recomendado)
-
-**1. Inicie a API:**
 ```bash
-cd src && python main.py
+curl http://localhost:8000/health
 ```
 
-**2. Acesse a documentação interativa:**
-```
-http://localhost:8000/docs
-```
-
-**3. Teste o endpoint `/extract`:**
-- Upload de um PDF
-- Defina label e schema
-- Veja o método usado (llm/cache/template/hybrid)
-
-**4. Teste o endpoint `/extract-batch` com streaming:**
-- Upload múltiplos PDFs
-- Receba resultados progressivos via SSE
-- Veja estatísticas finais
-
-### Monitoramento de Estatísticas
-
-Acesse o endpoint de estatísticas para ver métricas em tempo real:
+#### GET `/stats`
+Estatísticas detalhadas do sistema.
 
 ```bash
 curl http://localhost:8000/stats
 ```
 
-**Retorna:**
-- Cache hits/misses (L1 e L2)
-- Templates aprendidos por label
-- Total de chamadas LLM
-- Total de extrações via template
-- Tempo médio por método
+**Response:**
+```json
+{
+  "cache": {
+    "l1_size": 42,
+    "l1_hits": 158,
+    "l1_misses": 23,
+    "l2_hits": 12
+  },
+  "templates": {
+    "carteira_oab": 5,
+    "tela_sistema": 3
+  },
+  "extraction_counts": {
+    "llm_calls": 31,
+    "template_hits": 142,
+    "cache_hits": 170
+  }
+}
+```
+
+---
+
+## 🏗️ Arquitetura
+
+### Pipeline de Extração
+
+```
+┌─────────────┐
+│   PDF Input │
+└──────┬──────┘
+       │
+       ▼
+┌──────────────┐
+│ 1. Cache L1  │ ─── Hit? ──> Retorna (0.1ms)
+│    (Memory)  │
+└──────┬───────┘
+       │ Miss
+       ▼
+┌──────────────┐
+│ 2. Cache L2  │ ─── Hit? ──> Retorna (1-2ms)
+│    (Disk)    │
+└──────┬───────┘
+       │ Miss
+       ▼
+┌──────────────┐
+│ 3. Template  │
+│    Matching  │
+└──────┬───────┘
+       │
+       ▼
+  ┌────────────┐
+  │ Similaridade│
+  │   >= 90%?  │
+  └─────┬──────┘
+        │
+   ┌────┴────┐
+   │ SIM     │ NÃO
+   ▼         ▼
+┌────────┐ ┌────────┐
+│Template│ │  LLM   │
+│ (0.5s) │ │(2-5s)  │
+└───┬────┘ └───┬────┘
+    │          │
+    └────┬─────┘
+         ▼
+   ┌──────────┐
+   │ 4. Learn │
+   │ Template │
+   └─────┬────┘
+         │
+         ▼
+   ┌──────────┐
+   │ 5. Cache │
+   └─────┬────┘
+         │
+         ▼
+    ┌────────┐
+    │Response│
+    └────────┘
+```
+
+### Componentes
+
+1. **LLM Extractor** (`src/extraction/llm.py`)
+   - Modelo: `gpt-5-mini` com structured outputs
+   - Parser: `unstructured` com coordenadas espaciais
+   - Validação: Formatos brasileiros (CPF, CEP, telefone, etc.)
+   - Timeout: 120s por documento
+
+2. **Cache Manager** (`src/cache/`)
+   - L1 (Memory): LRU cache, ~0.1ms
+   - L2 (Disk): DiskCache persistente, ~1-2ms
+   - Hit rate: 50-90% após warm-up
+
+3. **Template Learning** (`src/template/`)
+   - Aprende padrões automaticamente de extrações LLM
+   - Similaridade >= 90% para ativar template
+   - Extração ~10x mais rápida que LLM
+
+4. **FastAPI Backend** (`src/main.py`)
+   - Documentação automática (Swagger UI)
+   - Health checks e monitoramento
+   - Batch processing com streaming
+
+---
+
+## 📊 Performance
+
+### Benchmarks
+
+| Cenário | Tempo | Método |
+|---------|-------|--------|
+| **Primeira extração** | ~3.5s | LLM completo |
+| **Cache hit (L1)** | <0.001s | Cache memória |
+| **Cache hit (L2)** | ~0.001s | Cache disco |
+| **Template match (>90%)** | ~0.5s | Template puro |
+| **Documento novo** | ~3.5s | LLM completo |
+
+### Evolução com Template Learning
+
+```
+Request 1 (doc_1.pdf): LLM    → 3.62s (aprende)
+Request 2 (doc_1.pdf): Cache  → 0.2ms (18.000x faster ⚡)
+Request 3 (doc_2.pdf): LLM    → 3.41s (aprende)
+Request 4 (doc_3.pdf): Template → 0.51s (7x faster ⚡)
+Request 5 (doc_2.pdf): Cache  → 0.2ms (cache hit)
+```
+
+**💡 Sistema aprende e fica progressivamente mais rápido!**
+
+### Acurácia
+
+- **Média geral**: 89-97%
+- **Validação de formatos **: CEP, CPF, telefone, valores monetários
+- **Structured outputs**: Garante JSON válido sempre
+
+---
+
+## 🎯 Tecnologias
+
+- **LLM**: OpenAI GPT-5-mini com structured outputs
+- **PDF Processing**: unstructured (coordenadas espaciais)
+- **Cache**: diskcache + LRU in-memory
+- **Template DB**: SQLite
+- **API**: FastAPI + uvicorn
+- **Container**: Docker + Docker Compose
+
+---
+
+## 🔧 Variáveis de Ambiente
+
+Crie um arquivo `.env` na raiz:
+
+```bash
+# Obrigatório
+OPENAI_API_KEY=sk-proj-...
+
+# Opcionais
+PORT=8000
+HOST=0.0.0.0
+LOG_LEVEL=info
+```
+
+---
 
 ## 📁 Estrutura do Projeto
 
 ```
 enter-fellowship/
 ├── src/
-│   ├── main.py                    # API FastAPI
+│   ├── main.py              # API FastAPI
+│   ├── pipeline.py          # Pipeline de extração
 │   ├── extraction/
-│   │   └── llm.py                # LLM + unstructured
+│   │   └── llm.py          # LLM + unstructured
 │   ├── cache/
-│   │   ├── cache_manager.py      # Cache multi-level
-│   │   └── cache_key.py          # Geração de chaves
+│   │   ├── cache_manager.py
+│   │   └── cache_key.py
 │   ├── template/
-│   │   ├── template_manager.py   # Orquestrador
-│   │   ├── pattern_learner.py    # Aprendizado
-│   │   ├── field_extractor.py    # Extração
-│   │   ├── template_matcher.py   # Matching
-│   │   └── database.py           # Persistência
+│   │   ├── template_manager.py
+│   │   ├── pattern_learner.py
+│   │   ├── field_extractor.py
+│   │   ├── template_matcher.py
+│   │   └── database.py
+│   ├── batch_extract.py     # Script CLI para batch
 │   └── storage/
-│       ├── cache_data/           # Cache L2
-│       └── templates.db          # Templates
-├── Dockerfile                     # Container
-├── docker-compose.yml            # Orquestração
-├── requirements.txt              # Dependências
+│       ├── cache_data/      # Cache L2
+│       └── templates.db     # Templates aprendidos
+├── Dockerfile
+├── docker-compose.yml
+├── requirements.txt
+└── .env
 ```
-
-## 🎨 Tecnologias Utilizadas
-
-- **LLM**: OpenAI GPT-5-mini
-- **PDF Processing**: unstructured
-- **Cache**: diskcache + OrderedDict (LRU)
-- **Template DB**: SQLite
-- **Hashing**: xxhash 
-- **API**: FastAPI + uvicorn
-- **Container**: Docker + Docker Compose
-
-## 💡 Decisões de Design
-
-### Por que Cache Multi-Level?
-- L1: Requisições imediatas (mesmo processo)
-- L2: Requisições após restart
-- L3: Schemas parciais (flexibilidade)
-
-### Por que Arquitetura Híbrida (Template + LLM)?
-- **Melhor dos dois mundos**: Velocidade do template + Precisão do LLM
-- **Inteligente**: Template extrai o que consegue, LLM complementa o resto
-- **Evolutivo**: Aprende com cada extração, fica progressivamente mais rápido
-- **Econômico**: 60-80% menos tokens enviados ao LLM
-- **Robusto**: Fallback automático se template falhar completamente
-- **Adaptativo**: Thresholds flexíveis para diferentes tipos de documentos
-
-### Por que unstructured + coordenadas?
-- Preserva estrutura espacial do documento
-- LLM entende "canto superior esquerdo"
-- Detecta tabelas automaticamente
-- Melhora acurácia em 10-15%
-
-## 🏆 Diferenciais
-
-1. **🎯 Arquitetura Híbrida**: Template extrai campos conhecidos + LLM complementa faltantes
-   - 2-3x mais rápido que LLM puro
-   - 60-80% redução de custos
-   - Mantém 80-90% de acurácia
-
-2. **⚡ Streaming Progressivo (SSE)**: Batch processing com resultados em tempo real
-   - Cliente recebe PDFs conforme processados
-   - Ideal para batches grandes (100+ PDFs)
-   - Timeout flexível por arquivo
-
-3. **🧠 Template Learning Inteligente**: Similaridade multi-métrica
-   - Estrutural (70%) + Tokens (20%) + Caracteres (10%)
-   - Aprende automaticamente sem supervisão
-   - Thresholds adaptativos por tipo de documento
-
-4. **💾 Cache Multi-Level**: L1 Memory + L2 Disk
-   - <0.001s para mesmos documentos
-   - 10.000x+ speedup
-   - Persistente entre restarts
-
-5. **📍 Coordenadas Espaciais**: Contexto posicional via `unstructured`
-   - LLM entende layout do documento
-   - 10-15% melhora na acurácia
-   - Detecta tabelas automaticamente
-
-6. **🚀 Production-Ready**: FastAPI + Docker + Swagger + Monitoramento
-   - Documentação interativa automática
-   - Health checks e estatísticas em tempo real
-   - Containerizado e pronto para deploy
 
 ---
 
-**Desenvolvido para Enter AI Fellowship** | Novembro 2025
+## 🐛 Troubleshooting
 
+### Docker
+
+**Porta 8000 em uso:**
+```bash
+# Opção 1: Parar processo
+lsof -ti:8000 | xargs kill -9
+
+# Opção 2: Mudar porta no docker-compose.yml
+ports:
+  - "8001:8000"
+```
+
+**Mudanças não refletem:**
+```bash
+docker compose down
+docker compose up -d --build
+```
+
+**Erro de permissão:**
+```bash
+docker compose down -v
+docker compose up -d
+```
+
+### API
+
+**Erro 500 ao extrair:**
+- Verifique `OPENAI_API_KEY` no `.env`
+- Veja logs: `docker compose logs -f api`
+
+**Batch muito lento:**
+- Normal na primeira vez (aprende templates)
+- Documentos subsequentes serão mais rápidos
+- Use `/stats` para ver cache hits
+
+**Acurácia baixa:**
+- Verifique se schema está bem definido
+- Confira qualidade do PDF (OCR pode falhar em PDFs ruins)
+- Veja logs de validação para campos específicos
+
+---
+
+## 🏆 Diferenciais
+
+1. **🎯 Template Learning Automático**: Aprende com cada extração, fica 7-10x mais rápido
+2. **⚡ Streaming Progressivo (SSE)**: Batch com resultados em tempo real
+3. **💾 Cache Multi-Level**: <1ms para documentos repetidos
+4. **📍 Validação BR**: Formatos brasileiros (CPF, CEP, telefone)
+5. **🚀 Production-Ready**: Docker, health checks, monitoramento
+6. **🧠 Structured Outputs**: JSON válido garantido
+
+---
+
+**Desenvolvido para Enter AI Fellowship** | 2025

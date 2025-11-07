@@ -1,8 +1,9 @@
 import openai
 import os
-from typing import Dict
+from typing import Dict, Any
 from dotenv import load_dotenv
 from unstructured.partition.pdf import partition_pdf
+import json
 
 load_dotenv()
 
@@ -12,12 +13,14 @@ class LLM:
         self.model: str = model
         self.client: openai.OpenAI = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-    def extract_data(self, pdf_path: str, prompt: str) -> str:
-        """Extrai dados de um PDF usando o modelo LLM
+    def extract_data(self, pdf_path: str, prompt: str, schema: Dict[str, str], label: str = "") -> str:
+        """Extrai dados de um PDF usando o modelo LLM com Structured Outputs
         
         Args:
             pdf_path: Caminho para o arquivo PDF
             prompt: Prompt com instruções de extração
+            schema: Schema de campos a extrair
+            label: Label do documento (para debug)
             
         Returns:
             str: Resposta do modelo (JSON com dados extraídos)
@@ -26,23 +29,39 @@ class LLM:
         pdf_text = self._prepare_for_llm(elements)
         
         user_message = f"{prompt}\n\n{pdf_text}"
-
-        print(user_message)
         
-        response = self.client.chat.completions.create(
-            model=self.model,
-            messages=[
-                {"role": "user", "content": user_message}
-            ],
-            response_format={"type": "json_object"},
-            store=False,
-            reasoning_effort="minimal"
-        )
+        # Cria JSON Schema para structured outputs
+        json_schema = self._create_json_schema(schema)
         
-        return response.choices[0].message.content
+        try:
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {"role": "user", "content": user_message}
+                ],
+                response_format={
+                    "type": "json_schema",
+                    "json_schema": json_schema
+                },
+                store=False,
+                reasoning_effort="minimal",
+                timeout=120.0  # 2 minutos timeout
+            )
+        except Exception:
+            raise
+        
+        # Parse e limpa resultado
+        result_dict = json.loads(response.choices[0].message.content)
+        
+        # Limpa cada valor
+        cleaned_result = {}
+        for field_name, value in result_dict.items():
+            cleaned_result[field_name] = self._clean_extracted_value(value, field_name)
+        
+        return json.dumps(cleaned_result)
     
-    def generate_prompt(self, label: str, schema: Dict[str,str]) -> str:
-        """Gerador de prompt para extração de dados de PDFs
+    def generate_prompt(self, label: str, schema: Dict[str, str]) -> str:
+        """Gerador de prompt otimizado para extração de dados de PDFs brasileiros
         
         Args:
             label: Tipo do documento (ex: 'carteira_oab', 'tela_sistema')
@@ -51,20 +70,92 @@ class LLM:
         Returns:
             str: Prompt formatado para o modelo LLM
         """
+        fields_list = "\n".join([f'  "{k}": {v}' for k, v in schema.items()])
         
-        # Prompt MINIMALISTA para máxima velocidade
-        fields_list = "\n".join([f'"{k}": {v}' for k, v in schema.items()])
+        prompt = f"""Você é um extrator ESPECIALIZADO em documentos BRASILEIROS do tipo "{label}".
 
-        
-        prompt = f"""Extraia em JSON do documento "{label}"
-O Json deve conter cada um dos seguintes atributos:
+⚠️ CONTEXTO IMPORTANTE: Todos os dados são do BRASIL (pt-BR).
 
+REGRAS CRÍTICAS DE EXTRAÇÃO:
+
+1. EXTRAIA APENAS O VALOR EXATO
+   - Sem texto adjacente, prefixos ou sufixos
+   - Exemplo: "0 CONSIGNADO" → extrair "CONSIGNADO"
+
+2. FORMATOS BRASILEIROS - PRESTE MUITA ATENÇÃO:
+   
+   📱 TELEFONE (8-9 dígitos + DDD):
+      - Formato: (DD) 9XXXX-XXXX ou (DD) XXXX-XXXX
+      - Exemplos: "(11) 98765-4321", "(21) 3456-7890"
+      - NÃO confunda com CEP ou outros números!
+   
+   📮 CEP (8 dígitos):
+      - Formato: XXXXX-XXX ou XXXXXXXX
+      - Exemplos: "01310-300", "04567890"
+      - Sempre 8 dígitos, geralmente com hífen
+      - NÃO confunda com telefone!
+      - Se existir o campo de endereço, coloque o CEP no campo de endereço.
+   
+   🆔 CPF (11 dígitos):
+      - Formato: XXX.XXX.XXX-XX
+      - Exemplo: "123.456.789-01"
+      - Sempre 11 dígitos
+   
+   🏢 CNPJ (14 dígitos):
+      - Formato: XX.XXX.XXX/XXXX-XX
+      - Exemplo: "12.345.678/0001-90"
+   
+    Valores monetários:
+        - No documento: "2.372,64"
+        - Extraia somente o valor numerico separado por virgula ou ponto.
+   
+   📅 DATAS:
+      - Formato: DD/MM/YYYY
+      - Exemplo: "15/03/2024"
+   
+   🔢 NÚMERO DE PARCELAS:
+      - Apenas o número, sem texto
+      - Exemplos: "12", "24", "96"
+      - NÃO extraia CEP ou telefone como parcelas!
+
+3. VALIDAÇÃO DE NÚMEROS - PENSE ANTES DE EXTRAIR:
+   
+   ❓ É um CEP? → Deve ter 8 dígitos
+   ❓ É um telefone? → Deve ter DDD + 8 ou 9 dígitos
+   ❓ É parcelas? → Geralmente número pequeno (1-120)
+   ❓ É CPF? → Sempre 11 dígitos
+   ❓ É valor? → Pode ter decimais
+   
+   SE O NÚMERO NÃO FAZ SENTIDO PARA O CAMPO → USE null
+
+4. EXEMPLOS ESPECÍFICOS:
+   
+   ✅ CORRETO:
+   - "CEP: 01310-300" → extrair "01310-300" (8 dígitos = CEP)
+   - "Tel: (11) 98765-4321" → extrair "(11) 98765-4321" (DDD + 9 dígitos = telefone)
+   - "Parcelas: 24" → extrair "24" (número pequeno = parcelas)
+   - "96 parcelas" → extrair "96"
+   
+   ❌ ERRADO:
+   - Extrair CEP como telefone
+   - Extrair telefone como CEP
+   - Extrair CEP como número de parcelas
+   - Inventar dados que não existem
+
+5. SE CAMPO AUSENTE:
+   - Use null (não invente dados)
+   - Melhor null do que dado errado
+
+CAMPOS A EXTRAIR:
 {fields_list}
-O conteudo esta com coordenadas exatas, portanto, extraia o conteudo de forma otimizada para cada campo.
-Preste atenção em padrões de numeros de documentos, como CPF, CEP, CNPJ, etc.
-Use null se ausente. Retorne só JSON.
-{self._generate_json_template(schema)}"""
 
+FORMATO DE SAÍDA:
+Retorne APENAS um objeto JSON válido com os campos acima.
+
+LEMBRE-SE: VALIDE se o número extraído faz SENTIDO para o campo!
+
+DOCUMENTO:
+"""
         return prompt
     
     def _generate_json_template(self, schema: Dict[str, str]) -> str:
@@ -72,6 +163,101 @@ Use null se ausente. Retorne só JSON.
         # Versão compacta para economizar tokens - JSON válido com chaves
         fields = ", ".join([f'"{k}": "..."' for k in schema.keys()])
         return f"{{{fields}}}"
+    
+    def _create_json_schema(self, schema: Dict[str, str]) -> Dict[str, Any]:
+        """Cria JSON Schema para Structured Outputs da OpenAI"""
+        properties = {}
+        for field_name, field_desc in schema.items():
+            properties[field_name] = {
+                "type": ["string", "null"],
+                "description": field_desc
+            }
+        
+        return {
+            "name": "pdf_extraction",
+            "strict": True,
+            "schema": {
+                "type": "object",
+                "properties": properties,
+                "required": list(schema.keys()),
+                "additionalProperties": False
+            }
+        }
+    
+    def _clean_extracted_value(self, value: Any, field_name: str) -> Any:
+        """Limpa e valida valor extraído com validação de formatos brasileiros"""
+        import re
+        
+        if value is None or value == "null":
+            return None
+        
+        value_str = str(value).strip()
+        field_lower = field_name.lower()
+        
+        # Remove prefixos numéricos isolados (ex: "0 CONSIGNADO" → "CONSIGNADO")
+        if ' ' in value_str and len(value_str) > 0 and value_str[0].isdigit():
+            parts = value_str.split(' ', 1)
+            if len(parts[0]) <= 2 and parts[0].isdigit():
+                value_str = parts[1]
+        
+        # VALIDAÇÃO: CEP (8 dígitos)
+        if any(x in field_lower for x in ['cep', 'codigo_postal']):
+            digits = re.sub(r'\D', '', value_str)
+            if len(digits) == 8:
+                return f"{digits[:5]}-{digits[5:]}"
+            return None
+        
+        # VALIDAÇÃO: Telefone (10-11 dígitos com DDD)
+        if any(x in field_lower for x in ['telefone', 'phone', 'celular', 'fone']):
+            digits = re.sub(r'\D', '', value_str)
+            if len(digits) == 11:  # DDD + 9 dígitos (celular)
+                return f"({digits[:2]}) {digits[2:7]}-{digits[7:]}"
+            elif len(digits) == 10:  # DDD + 8 dígitos (fixo)
+                return f"({digits[:2]}) {digits[2:6]}-{digits[6:]}"
+            return None
+        
+        # VALIDAÇÃO: CPF (11 dígitos)
+        if any(x in field_lower for x in ['cpf']):
+            digits = re.sub(r'\D', '', value_str)
+            if len(digits) == 11:
+                return f"{digits[:3]}.{digits[3:6]}.{digits[6:9]}-{digits[9:]}"
+            return None
+        
+        # VALIDAÇÃO: CNPJ (14 dígitos)
+        if any(x in field_lower for x in ['cnpj']):
+            digits = re.sub(r'\D', '', value_str)
+            if len(digits) == 14:
+                return f"{digits[:2]}.{digits[2:5]}.{digits[5:8]}/{digits[8:12]}-{digits[12:]}"
+            return None
+        
+        # VALIDAÇÃO: Número de parcelas (1-200)
+        if any(x in field_lower for x in ['parcela', 'qtd', 'quantidade']):
+            digits = re.sub(r'\D', '', value_str)
+            if digits.isdigit():
+                num = int(digits)
+                if 1 <= num <= 200:
+                    return str(num)
+            return None
+        
+        # Limpa valores monetários
+        if any(x in field_lower for x in ['valor', 'preco', 'price', 'total']):
+            value_str = value_str.replace('R$', '').replace(' ', '').strip()
+            if ',' in value_str:
+                value_str = value_str.replace('.', '').replace(',', '.')
+            try:
+                float(value_str)
+                return value_str
+            except:
+                return None
+        
+        # Limpa datas (DD/MM/YYYY)
+        if any(x in field_lower for x in ['data', 'date']):
+            value_str = value_str.replace('Data Referência:', '').replace('Data:', '').strip()
+            if re.match(r'\d{2}/\d{2}/\d{4}', value_str):
+                return value_str
+            return None
+        
+        return value_str if value_str else None
 
     def _structure_pdf(self, pdf_path: str) -> list:
         """
