@@ -13,10 +13,7 @@ services:
     env_file:
       - .env
     volumes:
-      # Persiste cache e templates
       - ./src/storage:/app/src/storage
-      # Desenvolvimento: hot reload (opcional, comente em produção)
-      - ./src:/app/src
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]

@@ -60,7 +60,6 @@ COPY --from=builder /usr/local/bin /usr/local/bin
 
 # Copia código da aplicação
 COPY src/ ./src/
-COPY .env .env
 
 # Cria diretórios necessários
 RUN mkdir -p ./src/storage/cache_data && \

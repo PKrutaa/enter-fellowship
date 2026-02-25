@@ -9,9 +9,10 @@ Endpoints:
 - GET /stats → Estatísticas de cache e templates
 """
 
-from fastapi import FastAPI, File, UploadFile, Form, HTTPException
+from fastapi import FastAPI, File, UploadFile, Form, HTTPException, Depends
 from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import APIKeyHeader
 from pydantic import BaseModel, Field
 from typing import Dict, Any, Optional, List
 import json
@@ -27,6 +28,17 @@ import threading
 
 # Imports da pipeline
 from src.pipeline import ExtractionPipeline
+
+# ==================== AUTH ====================
+
+_api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
+
+async def verify_api_key(api_key: Optional[str] = Depends(_api_key_header)):
+    expected = os.getenv("API_KEY")
+    if not expected:
+        return
+    if api_key != expected:
+        raise HTTPException(status_code=401, detail="Invalid or missing API key")
 
 # ==================== CONFIGURAÇÃO ====================
 
@@ -83,7 +95,7 @@ class BatchExtractResponse(BaseModel):
 
 # ==================== ENDPOINTS ====================
 
-@app.post("/extract", response_model=ExtractResponse)
+@app.post("/extract", response_model=ExtractResponse, dependencies=[Depends(verify_api_key)])
 async def extract_data(
     file: UploadFile = File(..., description="Arquivo PDF para extração"),
     label: str = Form(..., description="Tipo do documento (ex: 'carteira_oab', 'tela_sistema')"),
@@ -184,7 +196,7 @@ async def extract_data(
         )
 
 
-@app.post("/extract-batch")
+@app.post("/extract-batch", dependencies=[Depends(verify_api_key)])
 async def extract_batch(
     files: List[UploadFile] = File(..., description="Lista de arquivos PDF para extração"),
     labels: List[str] = Form(..., description="Label para cada arquivo (na mesma ordem dos files)"),
@@ -535,7 +547,7 @@ async def health_check():
     )
 
 
-@app.get("/stats")
+@app.get("/stats", dependencies=[Depends(verify_api_key)])
 async def get_stats():
     """
     Retorna estatísticas detalhadas da pipeline
