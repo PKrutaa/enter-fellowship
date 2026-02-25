@@ -15,6 +15,9 @@ RUN apt-get update && apt-get install -y \
     curl \
     gcc \
     g++ \
+    libxml2-dev \
+    libxslt1-dev \
+    zlib1g-dev \
     libmagic-dev \
     && rm -rf /var/lib/apt/lists/*
 
@@ -45,6 +48,8 @@ WORKDIR /app
 # Instala apenas runtime dependencies (não precisa compiladores)
 RUN apt-get update && apt-get install -y \
     libmagic1 \
+    libxml2 \
+    libxslt1.1 \
     poppler-utils \
     tesseract-ocr \
     tesseract-ocr-por \
@@ -75,4 +80,3 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
 
 # Comando para iniciar a API
 CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000"]
-
