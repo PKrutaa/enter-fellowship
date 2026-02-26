@@ -1,159 +1,159 @@
-# 🚀 Sistema de Extração de Dados de PDFs
+# 🚀 PDF Data Extraction System
 
-Sistema de extração estruturada de dados de documentos PDF com alta acurácia, baixa latência e custo otimizado. Production-ready.
+Structured data extraction system for PDF documents with high accuracy, low latency, and optimized cost. Production-ready.
 
 UI: https://enter-fellowship-front.vercel.app/
 
 ---
 
-## 🎯 Desafios, Decisões e Soluções
+## 🎯 Challenges, Decisions, and Solutions
 
-### 📊 Desafios Mapeados
+### 📊 Mapped Challenges
 
-Ao analisar o problema de extração de dados de PDFs diversos, identifiquei **5 desafios principais**:
+When analyzing the problem of extracting data from diverse PDFs, I identified **5 main challenges**:
 
-1. **💰 Custo Elevado de APIs LLM**
-   - Processar cada documento com LLM tem custo por token
-   - Processamento em larga escala (milhares de PDFs) pode gerar custos significativos
-   - Documentos repetidos ou similares geram custo desnecessário
+1. **💰 High LLM API Cost**
+   - Processing each document with an LLM has a per-token cost
+   - Large-scale processing (thousands of PDFs) can generate significant costs
+   - Repeated or similar documents generate unnecessary cost
 
-2. **⏱️ Latência Alta**
-   - LLMs têm latência de 2-5s por chamada
-   - Em batch de 100+ documentos, latência total pode chegar a minutos
-   - Usuários esperam respostas rápidas
+2. **⏱️ High Latency**
+   - LLMs have 2-5s latency per call
+   - In batches of 100+ documents, total latency can reach minutes
+   - Users expect fast responses
 
-3. **📄 Variabilidade de Layout**
-   - PDFs do mesmo tipo podem ter layouts levemente diferentes
-   - Posições de campos variam entre documentos
-   - Documentos digitalizados vs nativos têm estruturas diferentes
+3. **📄 Layout Variability**
+   - PDFs of the same type can have slightly different layouts
+   - Field positions vary across documents
+   - Scanned vs native documents have different structures
 
-4. **🎯 Acurácia Variável**
-   - OCR pode falhar em PDFs de baixa qualidade
-   - LLM pode extrair valores errados sem validação
-   - Formatos brasileiros (CPF, CEP, telefone) precisam de validação específica
+4. **🎯 Variable Accuracy**
+   - OCR can fail on low-quality PDFs
+   - LLM can extract wrong values without validation
+   - Brazilian formats (CPF, CEP, phone) require specific validation
 
-5. **📦 Processamento em Lote**
-   - Necessidade de processar centenas/milhares de PDFs
-   - Diferentes tipos de documentos no mesmo batch
-   - Usuários precisam de feedback progressivo (não esperar batch completo)
+5. **📦 Batch Processing**
+   - Need to process hundreds/thousands of PDFs
+   - Different document types in the same batch
+   - Users need progressive feedback (not wait for the entire batch to complete)
 
-### 💡 Decisões de Design
+### 💡 Design Decisions
 
-Decidi **endereçar todos os 5 desafios** com uma arquitetura híbrida e inteligente:
+I decided to **address all 5 challenges** with a hybrid and intelligent architecture:
 
-| Desafio | Decisão | Prioridade |
+| Challenge | Decision | Priority |
 |---------|---------|------------|
-| **Custo Elevado** | Cache multi-level + Template Learning | 🔴 Alta |
-| **Latência Alta** | Cache L1 em memória + Templates rápidos | 🔴 Alta |
-| **Variabilidade Layout** | Template Learning com threshold adaptativo | 🟡 Média |
-| **Acurácia Variável** | Structured Outputs + Validação de formatos BR | 🔴 Alta |
-| **Processamento Lote** | Streaming SSE + Paralelização por label | 🟢 Média |
+| **High Cost** | Multi-level cache + Template Learning | 🔴 High |
+| **High Latency** | In-memory L1 cache + Fast templates | 🔴 High |
+| **Layout Variability** | Template Learning with adaptive threshold | 🟡 Medium |
+| **Variable Accuracy** | Structured Outputs + Brazilian format validation | 🔴 High |
+| **Batch Processing** | SSE Streaming + Parallelization by label | 🟢 Medium |
 
-### 🛠️ Soluções Implementadas
+### 🛠️ Implemented Solutions
 
-#### 1. **Solução para Custo: Cache Multi-Level + Template Learning**
+#### 1. **Solution for Cost: Multi-Level Cache + Template Learning**
 
-**Problema:** LLM custa ~$0.002-0.005 por documento. Em 10.000 PDFs = $20-50.
+**Problem:** LLM costs ~$0.002-0.005 per document. For 10,000 PDFs = $20-50.
 
-**Solução implementada:**
+**Implemented solution:**
 ```
 ┌─────────────────────────────────────────────────────┐
 │  CACHE L1 (Memory)                                  │
-│  • LRU com 100 itens                                │
-│  • Custo: $0 | Latência: 0.1ms                     │
-│  • Hit rate: 30-50% em produção                    │
+│  • LRU with 100 items                               │
+│  • Cost: $0 | Latency: 0.1ms                        │
+│  • Hit rate: 30-50% in production                   │
 └─────────────────────────────────────────────────────┘
                     ↓ (miss)
 ┌─────────────────────────────────────────────────────┐
 │  CACHE L2 (Disk - DiskCache)                        │
-│  • Persistente entre restarts                       │
-│  • Custo: $0 | Latência: 1-2ms                     │
-│  • Hit rate: 20-40% adicional                      │
+│  • Persistent across restarts                       │
+│  • Cost: $0 | Latency: 1-2ms                        │
+│  • Hit rate: 20-40% additional                      │
 └─────────────────────────────────────────────────────┘
                     ↓ (miss)
 ┌─────────────────────────────────────────────────────┐
 │  TEMPLATE LEARNING                                  │
-│  • Aprende padrões automaticamente                  │
-│  • Similaridade >= 90% → usa template               │
-│  • Custo: $0 | Latência: 0.5s                      │
-│  • Hit rate: Aumenta com o tempo (10-30%)          │
+│  • Learns patterns automatically                    │
+│  • Similarity >= 90% → uses template                │
+│  • Cost: $0 | Latency: 0.5s                         │
+│  • Hit rate: Increases over time (10-30%)           │
 └─────────────────────────────────────────────────────┘
-                    ↓ (miss ou < 90%)
+                    ↓ (miss or < 90%)
 ┌─────────────────────────────────────────────────────┐
 │  LLM (GPT-5-mini)                                   │
-│  • Custo: $0.002-0.005 | Latência: 2-5s           │
-│  • Apenas quando necessário                         │
+│  • Cost: $0.002-0.005 | Latency: 2-5s              │
+│  • Only when necessary                              │
 └─────────────────────────────────────────────────────┘
 ```
 
-**Resultado:**
-- ✅ **80-90% de redução de custo** após warm-up (cache + templates)
-- ✅ Sistema aprende e fica **progressivamente mais barato**
-- ✅ Documentos idênticos: custo zero após primeira extração
+**Result:**
+- ✅ **80-90% cost reduction** after warm-up (cache + templates)
+- ✅ System learns and becomes **progressively cheaper**
+- ✅ Identical documents: zero cost after first extraction
 
-#### 2. **Solução para Latência: Cache L1 + Template Rápido**
+#### 2. **Solution for Latency: L1 Cache + Fast Template**
 
-**Problema:** LLM leva 2-5s. Em 100 documentos = 3-8 minutos.
+**Problem:** LLM takes 2-5s. For 100 documents = 3-8 minutes.
 
-**Solução implementada:**
+**Implemented solution:**
 ```python
-# Latências reais medidas:
-Cache L1 (Memory):    0.1ms   (21.000x mais rápido que LLM)
-Cache L2 (Disk):      1-2ms   (2.000x mais rápido)
-Template (>90%):      500ms   (7x mais rápido)
-LLM (primeira vez):   3.500ms (baseline)
+# Actual measured latencies:
+Cache L1 (Memory):    0.1ms   (21,000x faster than LLM)
+Cache L2 (Disk):      1-2ms   (2,000x faster)
+Template (>90%):      500ms   (7x faster)
+LLM (first time):    3,500ms  (baseline)
 ```
 
-**Estratégia:**
-1. **Cache L1**: Documentos idênticos retornam em < 1ms
-2. **Cache L2**: Documentos processados anteriormente retornam em ~1ms
-3. **Templates**: Documentos similares (>90%) retornam em ~500ms
-4. **LLM**: Apenas documentos novos/muito diferentes usam LLM (2-5s)
+**Strategy:**
+1. **Cache L1**: Identical documents return in < 1ms
+2. **Cache L2**: Previously processed documents return in ~1ms
+3. **Templates**: Similar documents (>90%) return in ~500ms
+4. **LLM**: Only new/very different documents use LLM (2-5s)
 
-**Resultado:**
-- ✅ **Latência média cai de 3.5s para ~0.5s** após warm-up
-- ✅ Batch de 100 PDFs: de 6min → ~2min (70% redução)
-- ✅ Latência melhora continuamente com uso
+**Result:**
+- ✅ **Average latency drops from 3.5s to ~0.5s** after warm-up
+- ✅ Batch of 100 PDFs: from 6min → ~2min (70% reduction)
+- ✅ Latency continuously improves with usage
 
-#### 3. **Solução para Variabilidade: Template Learning com Threshold de 90%**
+#### 3. **Solution for Variability: Template Learning with 90% Threshold**
 
-**Problema:** PDFs do mesmo tipo variam (posições, formatação).
+**Problem:** PDFs of the same type vary (positions, formatting).
 
-**Solução implementada:**
+**Implemented solution:**
 
-**Similaridade Multi-Métrica:**
+**Multi-Metric Similarity:**
 ```python
-Similaridade Total = (Estrutural × 70%) + (Tokens × 20%) + (Caracteres × 10%)
+Total Similarity = (Structural × 70%) + (Tokens × 20%) + (Characters × 10%)
 ```
 
-- **Estrutural (70%)**: Campos presentes (ex: "CPF", "Nome", "Data")
-- **Tokens (20%)**: Palavras-chave do domínio
-- **Caracteres (10%)**: Texto exato (menos importante)
+- **Structural (70%)**: Fields present (e.g., "CPF", "Name", "Date")
+- **Tokens (20%)**: Domain keywords
+- **Characters (10%)**: Exact text (less important)
 
 **Thresholds:**
-- **>= 90% similaridade**: Usa template puro (confio)
-- **< 90% similaridade**: Usa LLM completo (não confio)
-- **>= 2 amostras**: Mínimo para ativar template
+- **>= 90% similarity**: Uses pure template (trusted)
+- **< 90% similarity**: Uses full LLM (not trusted)
+- **>= 2 samples**: Minimum to activate template
 
-**Por que 90%?**
-- ✅ Garante alta precisão (não ativa template em doc diferente)
-- ✅ Permite pequenas variações de layout
-- ✅ Testado empiricamente: 90% = sweet spot entre velocidade e acurácia
+**Why 90%?**
+- ✅ Ensures high precision (doesn't activate template on different docs)
+- ✅ Allows small layout variations
+- ✅ Empirically tested: 90% = sweet spot between speed and accuracy
 
-**Resultado:**
-- ✅ Templates ativam apenas quando realmente aplicáveis
-- ✅ Zero falsos positivos (template errado aplicado)
-- ✅ Sistema adaptativo: aprende novos templates automaticamente
+**Result:**
+- ✅ Templates activate only when truly applicable
+- ✅ Zero false positives (wrong template applied)
+- ✅ Adaptive system: learns new templates automatically
 
-#### 4. **Solução para Acurácia: Structured Outputs + Validação BR**
+#### 4. **Solution for Accuracy: Structured Outputs + Brazilian Validation**
 
-**Problema:** LLM pode extrair valores errados, especialmente números brasileiros.
+**Problem:** LLM can extract wrong values, especially Brazilian numbers.
 
-**Solução implementada:**
+**Implemented solution:**
 
 **a) OpenAI Structured Outputs:**
 ```python
-# Força LLM a retornar JSON válido no schema exato
+# Forces LLM to return valid JSON in the exact schema
 response_format = {
     "type": "json_schema",
     "json_schema": {
@@ -170,53 +170,53 @@ response_format = {
 }
 ```
 
-**b) Validação de Formatos Brasileiros:**
+**b) Brazilian Format Validation:**
 ```python
-# CEP: Valida 8 dígitos → Formata XXXXX-XXX
-# CPF: Valida 11 dígitos → Formata XXX.XXX.XXX-XX
-# CNPJ: Valida 14 dígitos → Formata XX.XXX.XXX/XXXX-XX
-# Telefone: Valida DDD + 8-9 dígitos → Formata (DD) 9XXXX-XXXX
-# Parcelas: Valida range 1-200 (detecta confusão com CEP)
-# Valores: Normaliza vírgula→ponto, valida float
-# Datas: Valida formato DD/MM/YYYY
+# CEP: Validates 8 digits → Formats XXXXX-XXX
+# CPF: Validates 11 digits → Formats XXX.XXX.XXX-XX
+# CNPJ: Validates 14 digits → Formats XX.XXX.XXX/XXXX-XX
+# Phone: Validates area code + 8-9 digits → Formats (DD) 9XXXX-XXXX
+# Installments: Validates range 1-200 (detects confusion with CEP)
+# Values: Normalizes comma→period, validates float
+# Dates: Validates DD/MM/YYYY format
 ```
 
-**c) Prompt Especializado em Dados Brasileiros:**
+**c) Specialized Prompt for Brazilian Data:**
 ```
-⚠️ CONTEXTO: Todos os dados são do BRASIL (pt-BR)
+⚠️ CONTEXT: All data is from BRAZIL (pt-BR)
 
-VALIDAÇÃO DE NÚMEROS - PENSE ANTES DE EXTRAIR:
-❓ É um CEP? → Deve ter 8 dígitos
-❓ É um telefone? → Deve ter DDD + 8 ou 9 dígitos
-❓ É parcelas? → Geralmente número pequeno (1-120)
-❓ É CPF? → Sempre 11 dígitos
+NUMBER VALIDATION - THINK BEFORE EXTRACTING:
+❓ Is it a CEP? → Must have 8 digits
+❓ Is it a phone number? → Must have area code + 8 or 9 digits
+❓ Is it installments? → Usually a small number (1-120)
+❓ Is it a CPF? → Always 11 digits
 
-SE O NÚMERO NÃO FAZ SENTIDO PARA O CAMPO → USE null
+IF THE NUMBER DOESN'T MAKE SENSE FOR THE FIELD → USE null
 ```
 
-**Resultado:**
-- ✅ **97% de acurácia média** 
-- ✅ Zero confusão entre CEP/telefone/parcelas
-- ✅ Formatos brasileiros sempre corretos
-- ✅ JSON sempre válido (structured outputs)
+**Result:**
+- ✅ **97% average accuracy** 
+- ✅ Zero confusion between CEP/phone/installments
+- ✅ Brazilian formats always correct
+- ✅ JSON always valid (structured outputs)
 
-#### 5. **Solução para Batch: Streaming SSE + Paralelização por Label**
+#### 5. **Solution for Batch: SSE Streaming + Parallelization by Label**
 
-**Problema:** Usuário envia 100 PDFs de tipos diferentes, quer ver progresso.
+**Problem:** User sends 100 PDFs of different types, wants to see progress.
 
-**Solução implementada:**
+**Implemented solution:**
 
-**Arquitetura de Streaming:**
+**Streaming Architecture:**
 ```
 ┌──────────────────────────────────────────────────────┐
-│  Frontend envia: 50 PDFs "carteira_oab"             │
-│                 + 30 PDFs "tela_sistema"             │
-│                 + 20 PDFs "contrato"                 │
+│  Frontend sends: 50 PDFs "carteira_oab"              │
+│                 + 30 PDFs "tela_sistema"              │
+│                 + 20 PDFs "contrato"                  │
 └──────────────────┬───────────────────────────────────┘
                    │
                    ▼
 ┌────────────────────────────────────────────────────┐
-│  Backend agrupa por label                          │
+│  Backend groups by label                           │
 └────────┬──────────────┬──────────────┬─────────────┘
          │              │              │
          ▼              ▼              ▼
@@ -226,77 +226,77 @@ SE O NÚMERO NÃO FAZ SENTIDO PARA O CAMPO → USE null
     │(50 seq)│     │(30 seq)│     │(20 seq)│
     └────┬───┘     └────┬───┘     └────┬───┘
          │              │              │
-         ├─ PDF 1 ──────┼──────────────┼──> 📤 SSE evento 1
-         │              ├─ PDF 1 ──────┼──> 📤 SSE evento 2
-         ├─ PDF 2 ──────┼──────────────┼──> 📤 SSE evento 3
-         │              ├─ PDF 2 ──────┼──> 📤 SSE evento 4
+         ├─ PDF 1 ──────┼──────────────┼──> 📤 SSE event 1
+         │              ├─ PDF 1 ──────┼──> 📤 SSE event 2
+         ├─ PDF 2 ──────┼──────────────┼──> 📤 SSE event 3
+         │              ├─ PDF 2 ──────┼──> 📤 SSE event 4
          ...            ...            ...
 ```
 
-**Características:**
-1. **Paralelização por Label**: Labels diferentes processam em threads paralelas
-2. **Sequencial dentro da Label**: Para template learning funcionar
-3. **Streaming Progressivo (SSE)**: Cada PDF retorna IMEDIATAMENTE após processar
-4. **Não bloqueia**: Frontend recebe resultados em tempo real
+**Features:**
+1. **Parallelization by Label**: Different labels process in parallel threads
+2. **Sequential within Label**: For template learning to work
+3. **Progressive Streaming (SSE)**: Each PDF returns IMMEDIATELY after processing
+4. **Non-blocking**: Frontend receives results in real-time
 
-**Resultado:**
-- ✅ **Feedback instantâneo**: Usuário vê progresso em tempo real
-- ✅ **3x mais rápido**: Labels diferentes processam em paralelo
-- ✅ **Template learning funciona**: Sequencial dentro de cada label
-- ✅ **Escalável**: Suporta milhares de PDFs sem timeout
+**Result:**
+- ✅ **Instant feedback**: User sees progress in real-time
+- ✅ **3x faster**: Different labels process in parallel
+- ✅ **Template learning works**: Sequential within each label
+- ✅ **Scalable**: Supports thousands of PDFs without timeout
 
-### 📊 Impacto das Soluções
+### 📊 Solutions Impact
 
-| Métrica | Antes (LLM Puro) | Depois (Sistema Híbrido) | Melhoria |
+| Metric | Before (Pure LLM) | After (Hybrid System) | Improvement |
 |---------|------------------|--------------------------|----------|
-| **Custo (após warm-up)** | $0.004/doc | $0.0004/doc | **90% ↓** |
-| **Latência (média)** | 3.5s | 0.5s | **85% ↓** |
-| **Acurácia** | 85-90% | 97% | **7% ↑** |
+| **Cost (after warm-up)** | $0.004/doc | $0.0004/doc | **90% ↓** |
+| **Latency (average)** | 3.5s | 0.5s | **85% ↓** |
+| **Accuracy** | 85-90% | 97% | **7% ↑** |
 | **Batch 100 PDFs** | 6min | 2min | **67% ↓** |
-| **Documentos idênticos** | 3.5s | 0.2ms | **17.500x ↑** |
+| **Identical documents** | 3.5s | 0.2ms | **17,500x ↑** |
 
 ---
 
-## 🚀 Como Utilizar a Solução
+## 🚀 How to Use
 
-### Opção 1: Docker (Recomendado para Produção)
+### Option 1: Docker (Recommended for Production)
 
 ```bash
-# 1. Clone o repositório
+# 1. Clone the repository
 git clone <repo-url>
 cd enter-fellowship
 
-# 2. Configure sua OpenAI API Key
+# 2. Configure your OpenAI API Key
 echo "OPENAI_API_KEY=sk-proj-..." > .env
 
-# 3. Inicie com Docker
+# 3. Start with Docker
 docker compose up -d
 
-# 4. Acesse a API
+# 4. Access the API
 # - API: http://localhost:8000
 # - Docs: http://localhost:8000/docs
 # - Health: http://localhost:8000/health
 ```
 
-### Opção 2: Desenvolvimento Local com UV
+### Option 2: Local Development with UV
 
 ```bash
-# 1. Instale UV (gerenciador rápido de pacotes Python)
+# 1. Install UV (fast Python package manager)
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# 2. Instale dependências
+# 2. Install dependencies
 uv pip install -r requirements.txt
 
 # 3. Configure API Key
 echo "OPENAI_API_KEY=sk-proj-..." > .env
 
-# 4. Inicie a API
+# 4. Start the API
 uv run src/main.py
 ```
 
-### Uso Básico da API
+### Basic API Usage
 
-**Extrair PDF individual:**
+**Extract individual PDF:**
 ```bash
 curl -X POST "http://localhost:8000/extract" \
   -F "file=@documento.pdf" \
@@ -304,111 +304,111 @@ curl -X POST "http://localhost:8000/extract" \
   -F 'extraction_schema={"nome":"Nome","inscricao":"Número OAB"}'
 ```
 
-**Processar batch de PDFs:**
+**Process batch of PDFs:**
 ```bash
-# Via script CLI
+# Via CLI script
 docker compose exec api python src/batch_extract.py \
   --pdf-dir ./pdfs \
   --dataset-path dataset.json \
   --output-dir output
 ```
 
-**Ver documentação interativa:**
+**View interactive documentation:**
 ```
 http://localhost:8000/docs
 ```
 
 ---
 
-## 📋 Tabela de Conteúdo Técnica
+## 📋 Technical Table of Contents
 
-- [Início Rápido com Docker](#-início-rápido-com-docker)
-- [Processamento em Batch (Sem UI)](#-processamento-em-batch-sem-ui)
-- [API REST](#-api-rest)
-- [Arquitetura Detalhada](#-arquitetura)
-- [Performance e Benchmarks](#-performance)
+- [Docker Quick Start](#-docker-quick-start)
+- [Batch Processing (Without UI)](#-batch-processing-without-ui)
+- [REST API](#-rest-api)
+- [Detailed Architecture](#-architecture)
+- [Performance and Benchmarks](#-performance)
 
 ---
 
-## 🐳 Início Rápido com Docker
+## 🐳 Docker Quick Start
 
-### Pré-requisitos
-- Docker e Docker Compose instalados
-- Chave da API OpenAI
+### Prerequisites
+- Docker and Docker Compose installed
+- OpenAI API Key
 
-### Passo a Passo
+### Step by Step
 
-**1. Configure a API Key**
+**1. Configure the API Key**
 ```bash
-echo "OPENAI_API_KEY=sua-chave-aqui" > .env
+echo "OPENAI_API_KEY=your-key-here" > .env
 ```
 
-**2. Inicie os containers**
+**2. Start the containers**
 ```bash
 docker compose up -d
 ```
 
-**3. Verifique se está funcionando**
+**3. Verify it's running**
 ```bash
-# Ver logs
+# View logs
 docker compose logs -f
 
-# Testar health check
+# Test health check
 curl http://localhost:8000/health
 ```
 
-**4. Acesse a API**
+**4. Access the API**
 - **API**: http://localhost:8000
-- **Documentação**: http://localhost:8000/docs
+- **Documentation**: http://localhost:8000/docs
 - **Health**: http://localhost:8000/health
 - **Stats**: http://localhost:8000/stats
 
-### Comandos Docker Úteis
+### Useful Docker Commands
 
 ```bash
-# Parar containers
+# Stop containers
 docker compose down
 
-# Rebuild após mudanças
+# Rebuild after changes
 docker compose up -d --build
 
-# Ver logs em tempo real
+# View logs in real-time
 docker compose logs -f api
 
-# Entrar no container
+# Enter the container
 docker compose exec api bash
 
-# Ver uso de recursos
+# View resource usage
 docker stats
 
-# Limpar tudo (incluindo volumes)
+# Clean everything (including volumes)
 docker compose down -v
 ```
 
 ---
 
-## 📦 Processamento em Batch (Sem UI)
+## 📦 Batch Processing (Without UI)
 
-### Opção 1: Script CLI (Recomendado)
+### Option 1: CLI Script (Recommended)
 
-Para processamento offline em lote de um diretório:
+For offline batch processing of a directory:
 
-**Executar o script:**
+**Run the script:**
 ```bash
-# Dentro do container Docker
+# Inside the Docker container
 docker compose exec api python src/batch_extract.py \
   --pdf-dir ai-fellowship-data/files \
   --dataset-path ai-fellowship-data/dataset.json \
   --output-dir output
 
-# Ou localmente (se tiver Python configurado)
+# Or locally (if you have Python configured)
 python src/batch_extract.py \
   --pdf-dir ai-fellowship-data/files \
   --dataset-path ai-fellowship-data/dataset.json \
   --output-dir output
 ```
 
-**Estrutura esperada do dataset.json:**
+**Expected dataset.json structure:**
 ```json
 [
   {
@@ -430,12 +430,12 @@ python src/batch_extract.py \
 ]
 ```
 
-**Saída:**
-- Cria arquivo `output/consolidated_results.json` com todos os resultados
-- Cria arquivos individuais em `output/` para cada PDF processado
-- Cada resultado inclui: dados extraídos, método usado (cache/template/llm), metadata do pipeline
+**Output:**
+- Creates `output/consolidated_results.json` file with all results
+- Creates individual files in `output/` for each processed PDF
+- Each result includes: extracted data, method used (cache/template/llm), pipeline metadata
 
-**Exemplo de saída (`consolidated_results.json`):**
+**Output example (`consolidated_results.json`):**
 ```json
 {
   "total_processed": 2,
@@ -481,23 +481,23 @@ python src/batch_extract.py \
 ```
 
 
-### Opção 2: Via API com Streaming
+### Option 2: Via API with Streaming
 
-A API suporta **processamento progressivo com Server-Sent Events (SSE)**:
+The API supports **progressive processing with Server-Sent Events (SSE)**:
 
-**Características:**
-- ✅ **Múltiplos PDFs, múltiplas labels**: Cada arquivo pode ter label e schema diferentes
-- ✅ **Processamento paralelo por label**: Labels diferentes processam simultaneamente
-- ✅ **Resultados progressivos**: Recebe cada PDF assim que é processado (não espera o batch completo)
-- ✅ **Template learning**: Documentos do mesmo label processam sequencialmente para aprendizado
+**Features:**
+- ✅ **Multiple PDFs, multiple labels**: Each file can have different label and schema
+- ✅ **Parallel processing by label**: Different labels process simultaneously
+- ✅ **Progressive results**: Receives each PDF as soon as it's processed (doesn't wait for the full batch)
+- ✅ **Template learning**: Documents with the same label process sequentially for learning
 
-**Exemplo Python:**
+**Python Example:**
 
 ```python
 import requests
 import json
 
-# Preparar arquivos e metadados
+# Prepare files and metadata
 files_data = [
     {
         "file": ("oab_1.pdf", open("oab_1.pdf", "rb"), "application/pdf"),
@@ -516,12 +516,12 @@ files_data = [
     }
 ]
 
-# Criar FormData
+# Create FormData
 form_data = []
 for item in files_data:
     form_data.append(("files", item["file"]))
     
-# Adicionar labels e schemas na mesma ordem
+# Add labels and schemas in the same order
 labels = [item["label"] for item in files_data]
 schemas = [json.dumps(item["schema"]) for item in files_data]
 
@@ -530,7 +530,7 @@ data = {
     "schemas": schemas
 }
 
-# Fazer request com streaming
+# Make request with streaming
 response = requests.post(
     "http://localhost:8000/extract-batch",
     files=[("files", f[1]) for f in form_data],
@@ -538,10 +538,10 @@ response = requests.post(
         "labels": labels,
         "schemas": schemas
     },
-    stream=True  # 🔥 Importante: habilita streaming
+    stream=True  # 🔥 Important: enables streaming
 )
 
-# Processar resultados progressivamente
+# Process results progressively
 for line in response.iter_lines(decode_unicode=True):
     if not line:
         continue
@@ -552,7 +552,7 @@ for line in response.iter_lines(decode_unicode=True):
         data = json.loads(line.split(":", 1)[1].strip())
         
         if event_type == "result":
-            # Resultado individual (recebido assim que processa)
+            # Individual result (received as soon as processed)
             filename = data["filename"]
             success = data["success"]
             method = data["metadata"].get("method", "unknown")
@@ -561,46 +561,46 @@ for line in response.iter_lines(decode_unicode=True):
             print(f"✓ {filename}: {method} ({time:.2f}s)")
             
             if success:
-                print(f"  Dados: {data['data']}")
+                print(f"  Data: {data['data']}")
             else:
-                print(f"  Erro: {data['error']}")
+                print(f"  Error: {data['error']}")
         
         elif event_type == "complete":
-            # Estatísticas finais
-            print(f"\n📊 Processamento completo:")
+            # Final statistics
+            print(f"\n📊 Processing complete:")
             print(f"  Total: {data['total_files']}")
-            print(f"  Sucesso: {data['successful']}")
-            print(f"  Falhas: {data['failed']}")
-            print(f"  Tempo: {data['processing_time_seconds']:.2f}s")
+            print(f"  Success: {data['successful']}")
+            print(f"  Failures: {data['failed']}")
+            print(f"  Time: {data['processing_time_seconds']:.2f}s")
             print(f"  Labels: {', '.join(data['metadata']['labels_processed'])}")
 ```
 
-**Como o streaming funciona:**
+**How streaming works:**
 ```
-Envio: 2 PDFs "carteira_oab" + 3 PDFs "tela_sistema"
+Sending: 2 PDFs "carteira_oab" + 3 PDFs "tela_sistema"
 
-Processamento:
-├─ Thread 1: carteira_oab (processa sequencialmente)
-│   ├─ oab_1.pdf → 📤 SSE evento 1
-│   └─ oab_2.pdf → 📤 SSE evento 2
+Processing:
+├─ Thread 1: carteira_oab (processes sequentially)
+│   ├─ oab_1.pdf → 📤 SSE event 1
+│   └─ oab_2.pdf → 📤 SSE event 2
 │
-└─ Thread 2: tela_sistema (processa sequencialmente)
-    ├─ tela_1.pdf → 📤 SSE evento 3
-    ├─ tela_2.pdf → 📤 SSE evento 4
-    └─ tela_3.pdf → 📤 SSE evento 5
+└─ Thread 2: tela_sistema (processes sequentially)
+    ├─ tela_1.pdf → 📤 SSE event 3
+    ├─ tela_2.pdf → 📤 SSE event 4
+    └─ tela_3.pdf → 📤 SSE event 5
 
-📤 Evento final: complete
+📤 Final event: complete
 
-Resultado: Frontend recebe cada arquivo IMEDIATAMENTE após processar!
+Result: Frontend receives each file IMMEDIATELY after processing!
 ```
 ---
 
-## 🌐 API REST
+## 🌐 REST API
 
-### Endpoints Disponíveis
+### Available Endpoints
 
 #### POST `/extract`
-Extrai dados de um PDF individual.
+Extracts data from an individual PDF.
 
 **Request:**
 ```bash
@@ -627,19 +627,19 @@ curl -X POST "http://localhost:8000/extract" \
 ```
 
 #### POST `/extract-batch`
-Extrai dados de múltiplos PDFs com streaming progressivo (SSE).
+Extracts data from multiple PDFs with progressive streaming (SSE).
 
-Ver exemplo completo em [Processamento em Batch](#-processamento-em-batch-sem-ui).
+See full example in [Batch Processing](#-batch-processing-without-ui).
 
 #### GET `/health`
-Verifica saúde da API.
+Checks API health.
 
 ```bash
 curl http://localhost:8000/health
 ```
 
 #### GET `/stats`
-Estatísticas detalhadas do sistema.
+Detailed system statistics.
 
 ```bash
 curl http://localhost:8000/stats
@@ -668,9 +668,9 @@ curl http://localhost:8000/stats
 
 ---
 
-## 🏗️ Arquitetura
+## 🏗️ Architecture
 
-### Pipeline de Extração
+### Extraction Pipeline
 
 ```
 ┌─────────────┐
@@ -679,13 +679,13 @@ curl http://localhost:8000/stats
        │
        ▼
 ┌──────────────┐
-│ 1. Cache L1  │ ─── Hit? ──> Retorna (0.1ms)
+│ 1. Cache L1  │ ─── Hit? ──> Returns (0.1ms)
 │    (Memory)  │
 └──────┬───────┘
        │ Miss
        ▼
 ┌──────────────┐
-│ 2. Cache L2  │ ─── Hit? ──> Retorna (1-2ms)
+│ 2. Cache L2  │ ─── Hit? ──> Returns (1-2ms)
 │    (Disk)    │
 └──────┬───────┘
        │ Miss
@@ -697,12 +697,12 @@ curl http://localhost:8000/stats
        │
        ▼
   ┌────────────┐
-  │ Similaridade│
+  │ Similarity │
   │   >= 90%?  │
   └─────┬──────┘
         │
    ┌────┴────┐
-   │ SIM     │ NÃO
+   │ YES     │ NO
    ▼         ▼
 ┌────────┐ ┌────────┐
 │Template│ │  LLM   │
@@ -727,28 +727,28 @@ curl http://localhost:8000/stats
     └────────┘
 ```
 
-### Componentes
+### Components
 
 1. **LLM Extractor** (`src/extraction/llm.py`)
-   - Modelo: `gpt-5-mini` com structured outputs
-   - Parser: `unstructured` com coordenadas espaciais
-   - Validação: Formatos brasileiros (CPF, CEP, telefone, etc.)
-   - Timeout: 120s por documento
+   - Model: `gpt-5-mini` with structured outputs
+   - Parser: `unstructured` with spatial coordinates
+   - Validation: Brazilian formats (CPF, CEP, phone, etc.)
+   - Timeout: 120s per document
 
 2. **Cache Manager** (`src/cache/`)
    - L1 (Memory): LRU cache, ~0.1ms
-   - L2 (Disk): DiskCache persistente, ~1-2ms
-   - Hit rate: 50-90% após warm-up
+   - L2 (Disk): Persistent DiskCache, ~1-2ms
+   - Hit rate: 50-90% after warm-up
 
 3. **Template Learning** (`src/template/`)
-   - Aprende padrões automaticamente de extrações LLM
-   - Similaridade >= 90% para ativar template
-   - Extração ~10x mais rápida que LLM
+   - Automatically learns patterns from LLM extractions
+   - Similarity >= 90% to activate template
+   - Extraction ~10x faster than LLM
 
 4. **FastAPI Backend** (`src/main.py`)
-   - Documentação automática (Swagger UI)
-   - Health checks e monitoramento
-   - Batch processing com streaming
+   - Automatic documentation (Swagger UI)
+   - Health checks and monitoring
+   - Batch processing with streaming
 
 ---
 
@@ -756,38 +756,38 @@ curl http://localhost:8000/stats
 
 ### Benchmarks
 
-| Cenário | Tempo | Método |
+| Scenario | Time | Method |
 |---------|-------|--------|
-| **Primeira extração** | ~3.5s | LLM completo |
-| **Cache hit (L1)** | <0.001s | Cache memória |
-| **Cache hit (L2)** | ~0.001s | Cache disco |
-| **Template match (>90%)** | ~0.5s | Template puro |
-| **Documento novo** | ~3.5s | LLM completo |
+| **First extraction** | ~3.5s | Full LLM |
+| **Cache hit (L1)** | <0.001s | Memory cache |
+| **Cache hit (L2)** | ~0.001s | Disk cache |
+| **Template match (>90%)** | ~0.5s | Pure template |
+| **New document** | ~3.5s | Full LLM |
 
-### Evolução com Template Learning
+### Evolution with Template Learning
 
 ```
-Request 1 (doc_1.pdf): LLM    → 3.62s (aprende)
-Request 2 (doc_1.pdf): Cache  → 0.2ms (18.000x faster ⚡)
-Request 3 (doc_2.pdf): LLM    → 3.41s (aprende)
+Request 1 (doc_1.pdf): LLM    → 3.62s (learns)
+Request 2 (doc_1.pdf): Cache  → 0.2ms (18,000x faster ⚡)
+Request 3 (doc_2.pdf): LLM    → 3.41s (learns)
 Request 4 (doc_3.pdf): Template → 0.51s (7x faster ⚡)
 Request 5 (doc_2.pdf): Cache  → 0.2ms (cache hit)
 ```
 
-**💡 Sistema aprende e fica progressivamente mais rápido!**
+**💡 The system learns and becomes progressively faster!**
 
-### Acurácia
+### Accuracy
 
-- **Média geral**: 89-97%
-- **Validação de formatos **: CEP, CPF, telefone, valores monetários
-- **Structured outputs**: Garante JSON válido sempre
+- **Overall average**: 89-97%
+- **Format validation**: CEP, CPF, phone, monetary values
+- **Structured outputs**: Guarantees valid JSON at all times
 
 ---
 
-## 🎯 Tecnologias
+## 🎯 Technologies
 
-- **LLM**: OpenAI GPT-5-mini com structured outputs
-- **PDF Processing**: unstructured (coordenadas espaciais)
+- **LLM**: OpenAI GPT-5-mini with structured outputs
+- **PDF Processing**: unstructured (spatial coordinates)
 - **Cache**: diskcache + LRU in-memory
 - **Template DB**: SQLite
 - **API**: FastAPI + uvicorn
@@ -795,15 +795,15 @@ Request 5 (doc_2.pdf): Cache  → 0.2ms (cache hit)
 
 ---
 
-## 🔧 Variáveis de Ambiente
+## 🔧 Environment Variables
 
-Crie um arquivo `.env` na raiz:
+Create a `.env` file in the root:
 
 ```bash
-# Obrigatório
+# Required
 OPENAI_API_KEY=sk-proj-...
 
-# Opcionais
+# Optional
 PORT=8000
 HOST=0.0.0.0
 LOG_LEVEL=info
@@ -811,13 +811,13 @@ LOG_LEVEL=info
 
 ---
 
-## 📁 Estrutura do Projeto
+## 📁 Project Structure
 
 ```
 enter-fellowship/
 ├── src/
-│   ├── main.py              # API FastAPI
-│   ├── pipeline.py          # Pipeline de extração
+│   ├── main.py              # FastAPI API
+│   ├── pipeline.py          # Extraction pipeline
 │   ├── extraction/
 │   │   └── llm.py          # LLM + unstructured
 │   ├── cache/
@@ -829,10 +829,10 @@ enter-fellowship/
 │   │   ├── field_extractor.py
 │   │   ├── template_matcher.py
 │   │   └── database.py
-│   ├── batch_extract.py     # Script CLI para batch
+│   ├── batch_extract.py     # CLI script for batch
 │   └── storage/
-│       ├── cache_data/      # Cache L2
-│       └── templates.db     # Templates aprendidos
+│       ├── cache_data/      # L2 Cache
+│       └── templates.db     # Learned templates
 ├── Dockerfile
 ├── docker-compose.yml
 ├── requirements.txt
@@ -845,23 +845,23 @@ enter-fellowship/
 
 ### Docker
 
-**Porta 8000 em uso:**
+**Port 8000 in use:**
 ```bash
-# Opção 1: Parar processo
+# Option 1: Stop the process
 lsof -ti:8000 | xargs kill -9
 
-# Opção 2: Mudar porta no docker-compose.yml
+# Option 2: Change port in docker-compose.yml
 ports:
   - "8001:8000"
 ```
 
-**Mudanças não refletem:**
+**Changes not reflected:**
 ```bash
 docker compose down
 docker compose up -d --build
 ```
 
-**Erro de permissão:**
+**Permission error:**
 ```bash
 docker compose down -v
 docker compose up -d
@@ -869,31 +869,31 @@ docker compose up -d
 
 ### API
 
-**Erro 500 ao extrair:**
-- Verifique `OPENAI_API_KEY` no `.env`
-- Veja logs: `docker compose logs -f api`
+**500 error when extracting:**
+- Check `OPENAI_API_KEY` in `.env`
+- View logs: `docker compose logs -f api`
 
-**Batch muito lento:**
-- Normal na primeira vez (aprende templates)
-- Documentos subsequentes serão mais rápidos
-- Use `/stats` para ver cache hits
+**Batch too slow:**
+- Normal on first run (learning templates)
+- Subsequent documents will be faster
+- Use `/stats` to see cache hits
 
-**Acurácia baixa:**
-- Verifique se schema está bem definido
-- Confira qualidade do PDF (OCR pode falhar em PDFs ruins)
-- Veja logs de validação para campos específicos
-
----
-
-## 🏆 Diferenciais
-
-1. **🎯 Template Learning Automático**: Aprende com cada extração, fica 7-10x mais rápido
-2. **⚡ Streaming Progressivo (SSE)**: Batch com resultados em tempo real
-3. **💾 Cache Multi-Level**: <1ms para documentos repetidos
-4. **📍 Validação BR**: Formatos brasileiros (CPF, CEP, telefone)
-5. **🚀 Production-Ready**: Docker, health checks, monitoramento
-6. **🧠 Structured Outputs**: JSON válido garantido
+**Low accuracy:**
+- Check if schema is well defined
+- Verify PDF quality (OCR can fail on poor PDFs)
+- Check validation logs for specific fields
 
 ---
 
-**Desenvolvido para Enter AI Fellowship** | 2025
+## 🏆 Key Differentiators
+
+1. **🎯 Automatic Template Learning**: Learns from each extraction, becomes 7-10x faster
+2. **⚡ Progressive Streaming (SSE)**: Batch with real-time results
+3. **💾 Multi-Level Cache**: <1ms for repeated documents
+4. **📍 Brazilian Validation**: Brazilian formats (CPF, CEP, phone)
+5. **🚀 Production-Ready**: Docker, health checks, monitoring
+6. **🧠 Structured Outputs**: Guaranteed valid JSON
+
+---
+
+**Developed for Enter AI Fellowship** | 2025
