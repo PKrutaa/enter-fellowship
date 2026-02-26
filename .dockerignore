@@ -50,9 +50,7 @@ LICENSE
 .DS_Store
 
 # UV/Poetry
-uv.lock
 poetry.lock
-pyproject.toml
 
 # Docker
 Dockerfile
