@@ -11,7 +11,7 @@ ENV UV_SYSTEM_PYTHON=1 \
 WORKDIR /app
 
 # Instala dependências do sistema (compilação + UV)
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
     curl \
     gcc \
     g++ \
@@ -46,7 +46,7 @@ ENV PYTHONUNBUFFERED=1 \
 WORKDIR /app
 
 # Instala apenas runtime dependencies (não precisa compiladores)
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
     libmagic1 \
     libxml2 \
     libxslt1.1 \
