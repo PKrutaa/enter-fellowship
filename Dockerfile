@@ -1,7 +1,7 @@
 # Dockerfile Otimizado - Multi-stage build com UV
 
 # ============== STAGE 1: Builder ==============
-FROM python:3.13-slim as builder
+FROM python:3.12-slim as builder
 
 # Variáveis de ambiente para build
 ENV UV_SYSTEM_PYTHON=1 \
@@ -33,7 +33,7 @@ RUN /root/.local/bin/uv pip install --system -r requirements.txt
 
 
 # ============== STAGE 2: Runtime ==============
-FROM python:3.13-slim
+FROM python:3.12-slim
 
 # Metadados
 LABEL maintainer="Enter AI Fellowship"
@@ -60,7 +60,7 @@ RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-ins
     && rm -rf /var/lib/apt/lists/*
 
 # Copia dependências Python instaladas do builder
-COPY --from=builder /usr/local/lib/python3.13/site-packages /usr/local/lib/python3.13/site-packages
+COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
 
 # Copia código da aplicação
